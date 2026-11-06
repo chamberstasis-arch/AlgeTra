@@ -699,3 +699,7 @@ La separación requerirá plan de datos, observabilidad, idempotencia, fallos di
 | Ejecución durable futura | [Temporal](https://docs.temporal.io/temporal) | Alternativa de mediano plazo para workflows complejos y recuperables. |
 | Cola inicial | [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) | Sustenta workers horizontales, reintentos y colas; exige idempotencia propia. |
 | Documentos flexibles | [PostgreSQL JSONB](https://www.postgresql.org/docs/current/datatype-json.html) | JSONB se usa en unidades acotadas y no como una fila monolítica para todo el documento. |
+
+## 23. Decisión arquitectónica formal
+
+La elección de un **monolito modular escalable con procesamiento asíncrono** y los criterios para extraer módulos como servicios independientes quedan formalizados en [ADR-001](./artefactos/07-adr-001-arquitectura-monolito-modular.md). El [FBS](./artefactos/05-feature-breakdown-structure.md) y el [feature model](./artefactos/06-feature-model.md) descomponen las capacidades sin convertirlas automáticamente en microservicios.

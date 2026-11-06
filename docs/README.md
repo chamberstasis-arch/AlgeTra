@@ -34,7 +34,7 @@ Esta carpeta concentra la documentación funcional, técnica y de producto defin
 
 ## Autoridad documental
 
-La [ERS](./03-ers-especificacion-de-requisitos.md) es la fuente normativa principal. Los catálogos funcional y no funcional detallan sus requisitos; el PRD explica su valor y prioridad; los casos de uso, la arquitectura y la matriz de trazabilidad demuestran cómo se realizará y verificará.
+La [ERS](./03-ers-especificacion-de-requisitos.md) es la fuente normativa principal. Los catálogos funcional y no funcional detallan sus requisitos; el PRD explica su valor y prioridad; los casos de uso, la arquitectura, el FBS, el feature model y la matriz de trazabilidad demuestran cómo se realizará y verificará. Las decisiones de arquitectura se registran en ADR dentro de `docs/artefactos/`.
 
 ## Estado
 
