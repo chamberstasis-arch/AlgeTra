@@ -20,6 +20,7 @@ Esta carpeta contiene entregables documentales agrupados para revisar, diseñar 
 14. [ART-013 — Alcance separado de frontend y backend](./13-alcance-front-back-mvp.md)
 15. [ART-014 — Matriz versionable de evaluación OCR y proveedores](./14-matriz-evaluacion-ocr-y-proveedores.md)
 16. [ART-015 — MVP funcional de transcripción con Mathpix (álgebra lineal)](./15-mvp-transcripcion-mathpix.md)
+17. [ART-016 — Base de actividades y verificación de la transcripción](./16-corpus-actividades-y-verificacion.md)
 
 ## Relación con la documentación normativa
 

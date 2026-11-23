@@ -50,6 +50,25 @@ export interface MathpixMeta {
   autoRotateDegrees?: number
 }
 
+export interface Exercise {
+  /** `actividad/numero`, p. ej. `act-01/3`. */
+  ref: string
+  number: string
+  statement: string
+  answerText: string
+  /** Fórmulas de la respuesta final (puede haber varias: incisos). */
+  answers: string[]
+}
+
+export interface Activity {
+  id: string
+  title: string
+  topic?: string
+  file: string
+  exercises: Exercise[]
+  warnings: string[]
+}
+
 export interface PageReview {
   /** `true` cuando una persona ya validó la página (con o sin cambios). */
   reviewed: boolean
@@ -59,6 +78,8 @@ export interface PageReview {
   tags: ErrorTag[]
   notes: string
   reviewedAt?: string
+  /** Ejercicios de la base (`act-01/3`) que se resuelven en esta página. */
+  exerciseRefs?: string[]
 }
 
 export interface Page {
@@ -130,6 +151,8 @@ export interface PageMetrics {
   unchanged: boolean
 }
 
+export type AnswerStatus = 'found' | 'mismatch' | 'not-found' | 'unverifiable'
+
 export interface PageReportRow {
   order: number
   filename: string
@@ -142,6 +165,10 @@ export interface PageReportRow {
   latencyMs?: number
   mock?: boolean
   metrics?: PageMetrics
+  exerciseRefs?: string[]
+  /** ¿Aparece la respuesta esperada en la transcripción original / en la corregida? */
+  answerOriginal?: AnswerStatus
+  answerReviewed?: AnswerStatus
 }
 
 export interface RunReport {
@@ -157,6 +184,8 @@ export interface RunReport {
     meanMathTokenErrorRate: number | null
     equations: { total: number; exact: number; substituted: number; inserted: number; deleted: number; exactRate: number | null }
   }
+  /** Respuesta final frente a la base de actividades (solo páginas con ejercicio asignado). */
+  answers: { pagesWithReference: number; foundInOriginal: number; mismatchInOriginal: number; foundInReviewed: number; reviewedWithReference: number }
   ratings: Record<PageRating, number>
   tags: { tag: ErrorTag; label: string; pages: number }[]
   performance: { meanLatencyMs: number | null; p95LatencyMs: number | null; meanConfidence: number | null }
@@ -165,3 +194,24 @@ export interface RunReport {
   pages: PageReportRow[]
 }
 
+
+export interface EquationCheckDTO {
+  latex: string
+  status: 'ok' | 'inconsistent' | 'unverifiable'
+  detail: string
+  cells?: { row: number; col: number; left: string; right: string }[]
+}
+
+export interface ExerciseCheckDTO {
+  ref: string
+  number: string
+  statement: string
+  answerText: string
+  answers: { expected: string; status: AnswerStatus; detail: string }[]
+  status: AnswerStatus
+}
+
+export interface ChecksResponse {
+  consistency: { verified: number; inconsistent: number; unverifiable: number; checks: EquationCheckDTO[] }
+  exercises: ExerciseCheckDTO[]
+}

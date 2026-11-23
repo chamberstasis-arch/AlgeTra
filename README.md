@@ -28,6 +28,16 @@ Los datos (imágenes, transcripciones, respuestas brutas) quedan en `data/`, fue
 4. **Precisión**: fórmulas exactas, error de tokens LaTeX, CER del texto, latencia, costo, dónde falla. Descarga el informe `.md`.
 5. **Descargar DOCX** (corregido u original). Antes avisa si alguna fórmula no se pudo convertir a ecuación de Word.
 
+## Base de actividades y verificación
+
+Las actividades de referencia viven en `corpus/actividades/*.md` (formato en [`corpus/README.md`](corpus/README.md)). Como cada alumno resuelve a su manera, la base guarda el **enunciado y la respuesta final**, no el procedimiento. Al revisar una página asignas el ejercicio y el sistema:
+
+- comprueba si la **respuesta esperada aparece** en lo transcrito (aritmética exacta con fracciones, sin importar el método);
+- **recalcula** lo que el alumno escribió (`A+B=C`, productos, determinantes, transpuestas) y señala la **celda exacta** que no cuadra: normalmente un dígito mal leído por el OCR o un error del alumno;
+- marca como *no verificable* lo simbólico; nunca lo da por correcto.
+
+Pruebas: `pnpm test`.
+
 ## Estado verificado
 
 - Compila (`pnpm typecheck`, `pnpm build`).

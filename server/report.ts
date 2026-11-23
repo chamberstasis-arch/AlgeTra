@@ -1,13 +1,16 @@
 import { comparePage } from '../src/shared/metrics'
 import {
   ERROR_TAG_LABELS,
+  type AnswerStatus,
   type ErrorTag,
   type PageRating,
   type PageReportRow,
   type Run,
   type RunReport,
 } from '../src/shared/types'
+import { pageAnswerStatus } from './checks'
 import { config } from './config'
+import { findExercises } from './corpus'
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 const pct = (xs: number[], p: number) => {
@@ -16,7 +19,17 @@ const pct = (xs: number[], p: number) => {
   return s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)]
 }
 
-export function buildReport(run: Run): RunReport {
+export async function buildReport(run: Run): Promise<RunReport> {
+  const answerByPage = new Map<string, { original?: AnswerStatus; reviewed?: AnswerStatus }>()
+  for (const p of run.pages) {
+    const refs = p.review.exerciseRefs ?? []
+    if (!refs.length || p.text === undefined) continue
+    const exs = await findExercises(refs)
+    answerByPage.set(p.id, {
+      original: pageAnswerStatus(p.text, exs),
+      reviewed: p.review.reviewed ? pageAnswerStatus(p.review.editedText ?? p.text, exs) : undefined,
+    })
+  }
   const rows: PageReportRow[] = [...run.pages]
     .sort((a, b) => a.order - b.order)
     .map((p) => ({
@@ -30,6 +43,9 @@ export function buildReport(run: Run): RunReport {
       confidence: p.meta?.confidence,
       latencyMs: p.latencyMs,
       mock: p.mock,
+      exerciseRefs: p.review.exerciseRefs,
+      answerOriginal: answerByPage.get(p.id)?.original,
+      answerReviewed: answerByPage.get(p.id)?.reviewed,
       metrics:
         p.review.reviewed && p.text !== undefined ? comparePage(p.text, p.review.editedText ?? p.text) : undefined,
     }))
@@ -64,6 +80,13 @@ export function buildReport(run: Run): RunReport {
       meanTextWer: mean(measured.map((r) => r.metrics!.textWer)),
       meanMathTokenErrorRate: mean(measured.map((r) => r.metrics!.mathTokenErrorRate)),
       equations: { ...eq, exactRate: eq.total ? eq.exact / eq.total : null },
+    },
+    answers: {
+      pagesWithReference: rows.filter((r) => r.answerOriginal).length,
+      foundInOriginal: rows.filter((r) => r.answerOriginal === 'found').length,
+      mismatchInOriginal: rows.filter((r) => r.answerOriginal === 'mismatch').length,
+      reviewedWithReference: rows.filter((r) => r.answerReviewed).length,
+      foundInReviewed: rows.filter((r) => r.answerReviewed === 'found').length,
     },
     ratings,
     tags: [...tagCount.entries()]
@@ -112,6 +135,12 @@ export function reportToMarkdown(r: RunReport): string {
     `- Latencia media: ${r.performance.meanLatencyMs === null ? '—' : `${Math.round(r.performance.meanLatencyMs)} ms`} · p95: ${r.performance.p95LatencyMs === null ? '—' : `${Math.round(r.performance.p95LatencyMs)} ms`}`,
     `- Confianza media reportada por Mathpix: ${p1(r.performance.meanConfidence)}`,
     `- Llamadas a Mathpix: ${r.cost.mathpixCalls} · costo estimado: US$ ${r.cost.estimatedUsd.toFixed(4)}`,
+    '',
+    '## Respuesta final frente a la base de actividades',
+    '',
+    r.answers.pagesWithReference
+      ? `- Páginas con ejercicio asignado: ${r.answers.pagesWithReference}\n- La respuesta esperada aparece en la transcripción **original**: ${r.answers.foundInOriginal} (${p1(r.answers.foundInOriginal / r.answers.pagesWithReference)}) · con valor distinto: ${r.answers.mismatchInOriginal}\n- En la transcripción **corregida**: ${r.answers.foundInReviewed} de ${r.answers.reviewedWithReference} revisadas\n- Una respuesta distinta puede ser error del OCR **o** del alumno: revisa la página.`
+      : '- Sin ejercicios asignados (asígnalos al revisar cada página).',
     '',
     '## Valoración manual',
     '',

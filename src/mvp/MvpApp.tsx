@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import {
   ERROR_TAGS,
   ERROR_TAG_LABELS,
+  type Activity,
+  type AnswerStatus,
   type AppConfig,
+  type ChecksResponse,
   type ErrorTag,
   type Page,
   type PageRating,
@@ -20,6 +23,13 @@ const STATUS_LABEL: Record<Page['status'], string> = {
   processing: 'Transcribiendo…',
   done: 'Transcrita',
   error: 'Error',
+}
+
+const ANSWER_LABEL: Record<AnswerStatus, string> = {
+  found: '✓ Respuesta esperada encontrada',
+  mismatch: '✗ La respuesta no coincide',
+  'not-found': '— No se halló un valor comparable',
+  unverifiable: '— No verificable automáticamente',
 }
 
 const RATINGS: { value: PageRating; label: string }[] = [
@@ -516,14 +526,30 @@ function ReviewPanel({ run, page, hasPrev, hasNext, onNav, onSaved, onRetry, onD
   const [tab, setTab] = useState<'edit' | 'original'>('edit')
   const [zoom, setZoom] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [refs, setRefs] = useState<string[]>(page.review.exerciseRefs ?? [])
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [checks, setChecks] = useState<ChecksResponse | null>(null)
   const area = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    api.corpus().then((c) => setActivities(c.activities)).catch(() => {})
+  }, [])
+
+  // Verificación en vivo (con pequeña espera) del texto que se está corrigiendo.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api.checks(text, refs).then(setChecks).catch(() => {})
+    }, 350)
+    return () => clearTimeout(t)
+  }, [text, refs])
 
   const unchanged = text === original
   const dirty =
     text !== (page.review.editedText ?? original) ||
     rating !== page.review.rating ||
     notes !== page.review.notes ||
-    tags.join() !== page.review.tags.join()
+    tags.join() !== page.review.tags.join() ||
+    refs.join() !== (page.review.exerciseRefs ?? []).join()
 
   const save = async (reviewed: boolean, advance = false) => {
     setSaving(true)
@@ -534,6 +560,7 @@ function ReviewPanel({ run, page, hasPrev, hasNext, onNav, onSaved, onRetry, onD
         rating: rating ?? (reviewed && unchanged ? 'perfect' : null),
         tags,
         notes,
+        exerciseRefs: refs,
       })
       onSaved(saved)
       if (advance && hasNext) onNav(1)
@@ -660,6 +687,63 @@ function ReviewPanel({ run, page, hasPrev, hasNext, onNav, onSaved, onRetry, onD
               <div className="preview">
                 <MathView text={tab === 'edit' ? text : original} />
               </div>
+
+              <h3>Base de actividades</h3>
+              <div className="row wrap-tight">
+                <select
+                  value=""
+                  aria-label="Asignar ejercicio de la base"
+                  onChange={(e) => e.target.value && !refs.includes(e.target.value) && setRefs([...refs, e.target.value])}
+                >
+                  <option value="">+ Ejercicio de esta página…</option>
+                  {activities.map((a) => (
+                    <optgroup key={a.id} label={`${a.id} · ${a.title}`}>
+                      {a.exercises.map((x) => (
+                        <option key={x.ref} value={x.ref}>
+                          Ejercicio {x.number}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                {refs.map((r) => (
+                  <button key={r} className="chip-btn on" title="Quitar" onClick={() => setRefs(refs.filter((x) => x !== r))}>
+                    {r} ✕
+                  </button>
+                ))}
+              </div>
+              {!activities.length && <p className="muted small">No hay actividades en <code>corpus/actividades/</code> (ver <code>corpus/README.md</code>).</p>}
+              {checks?.exercises.map((x) => (
+                <div key={x.ref} className={`exercise ex-${x.status}`}>
+                  <div className="row between">
+                    <strong>{x.ref}</strong>
+                    <span className="small">{ANSWER_LABEL[x.status]}</span>
+                  </div>
+                  <MathView text={x.statement} />
+                  <p className="muted small">Respuesta esperada:</p>
+                  <MathView text={x.answerText} />
+                  {x.status !== 'found' && x.answers.map((a, i) => <p key={i} className="small">{a.detail}</p>)}
+                </div>
+              ))}
+
+              <h3>Verificación aritmética</h3>
+              {checks ? (
+                <>
+                  <p className="small muted">
+                    {checks.consistency.verified} verificadas · <strong className={checks.consistency.inconsistent ? 'bad' : ''}>{checks.consistency.inconsistent} inconsistentes</strong> · {checks.consistency.unverifiable} no verificables (con variables o símbolos)
+                  </p>
+                  {checks.consistency.checks
+                    .filter((c) => c.status === 'inconsistent')
+                    .map((c, i) => (
+                      <div key={i} className="exercise ex-mismatch">
+                        <code>{c.latex.length > 90 ? `${c.latex.slice(0, 90)}…` : c.latex}</code>
+                        <p className="small">{c.detail} Puede ser un dígito mal leído o un error del alumno: compara con la imagen.</p>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <p className="small muted">Calculando…</p>
+              )}
 
               <h3>Evaluación de esta página</h3>
               <div className="chips">

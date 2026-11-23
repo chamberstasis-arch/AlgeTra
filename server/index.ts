@@ -3,6 +3,8 @@ import Fastify from 'fastify'
 import { ERROR_TAGS, type AppConfig, type ErrorTag, type PageRating, type Run } from '../src/shared/types'
 import { buildDocx } from './docx'
 import { config, mathpixMode } from './config'
+import { runChecks } from './checks'
+import { corpusDir, findExercises, loadCorpus } from './corpus'
 import { enqueue, resumeInterrupted } from './queue'
 import { buildReport, reportToMarkdown } from './report'
 import * as store from './store'
@@ -119,6 +121,7 @@ interface ReviewBody {
   rating?: PageRating | null
   tags?: ErrorTag[]
   notes?: string
+  exerciseRefs?: string[]
 }
 
 app.patch<{ Params: { id: string; pid: string }; Body: ReviewBody }>('/api/runs/:id/pages/:pid/review', async (req) => {
@@ -134,6 +137,7 @@ app.patch<{ Params: { id: string; pid: string }; Body: ReviewBody }>('/api/runs/
   }
   if (b.tags) r.tags = b.tags.filter((t) => (ERROR_TAGS as readonly string[]).includes(t))
   if (typeof b.notes === 'string') r.notes = b.notes.slice(0, 2000)
+  if (Array.isArray(b.exerciseRefs)) r.exerciseRefs = b.exerciseRefs.filter((x) => typeof x === 'string').slice(0, 20)
   if (typeof b.reviewed === 'boolean') {
     if (b.reviewed && page.text === undefined) throw badRequest('No se puede revisar una página sin transcripción.')
     r.reviewed = b.reviewed
@@ -141,6 +145,18 @@ app.patch<{ Params: { id: string; pid: string }; Body: ReviewBody }>('/api/runs/
   }
   await store.persist(run)
   return page
+})
+
+// ---------- corpus de actividades y verificación ----------
+
+app.get('/api/corpus', async () => ({ dir: corpusDir, activities: await loadCorpus() }))
+
+// Verifica un texto (el que se está editando) contra los ejercicios elegidos. No guarda nada.
+app.post<{ Body: { text?: string; exerciseRefs?: string[] } }>('/api/checks', async (req) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text : ''
+  if (text.length > 200_000) throw badRequest('Texto demasiado largo.')
+  const exercises = await findExercises(Array.isArray(req.body?.exerciseRefs) ? req.body.exerciseRefs : [])
+  return runChecks(text, exercises)
 })
 
 // ---------- exportación ----------
@@ -197,7 +213,7 @@ app.get<{ Params: { id: string } }>('/api/runs/:id/report.md', async (req, reply
   return reply
     .header('Content-Disposition', `attachment; filename="informe-${safeName(run.name)}.md"`)
     .type('text/markdown; charset=utf-8')
-    .send(reportToMarkdown(buildReport(run)))
+    .send(reportToMarkdown(await buildReport(run)))
 })
 
 app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {

@@ -1,4 +1,4 @@
-import type { AppConfig, ErrorTag, Page, PageRating, Run, RunReport, RunSummary } from '../shared/types'
+import type { Activity, AppConfig, ChecksResponse, ErrorTag, Page, PageRating, Run, RunReport, RunSummary } from '../shared/types'
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, init)
@@ -26,6 +26,7 @@ export interface ReviewPatch {
   rating?: PageRating | null
   tags?: ErrorTag[]
   notes?: string
+  exerciseRefs?: string[]
 }
 
 export interface UploadResult {
@@ -40,6 +41,8 @@ export interface ExportCheck {
 
 export const api = {
   config: () => req<AppConfig>('/config'),
+  corpus: () => req<{ dir: string; activities: Activity[] }>('/corpus'),
+  checks: (text: string, exerciseRefs: string[]) => req<ChecksResponse>('/checks', json('POST', { text, exerciseRefs })),
   listRuns: () => req<RunSummary[]>('/runs'),
   getRun: (id: string) => req<Run>(`/runs/${id}`),
   createRun: (name: string, documentLayout: boolean) => req<Run>('/runs', json('POST', { name, documentLayout })),

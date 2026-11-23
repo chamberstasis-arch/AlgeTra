@@ -155,3 +155,12 @@ table.data th { background: #f6f7f9; font-size: 0.78rem; color: var(--muted); }
   .pagelist, .viewer-wrap { position: static; max-height: none; }
   .viewer { max-height: 50vh; }
 }
+
+.wrap-tight { flex-wrap: wrap; }
+.editor-wrap select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; max-width: 100%; }
+.exercise { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 8px 12px; margin-top: 8px; background: #fff; }
+.exercise p { margin: 4px 0; }
+.ex-found { border-left-color: var(--ok); }
+.ex-mismatch { border-left-color: var(--err); background: #fff8f7; }
+.ex-not-found, .ex-unverifiable { border-left-color: #aab2bf; }
+.bad { color: var(--err); }

@@ -31,4 +31,13 @@ $$\langle u, v\rangle=\sum_{i=1}^{n} u_{i} v_{i}, \quad u \perp v \Leftrightarro
 $$P=A\left(A^{T} A\right)^{-1} A^{T}, \qquad \mathrm{Nul}(A)^{\perp}=\operatorname{Col}\left(A^{T}\right)$$
 
 Los vectores $\mathbf{u}_{1}, \mathbf{u}_{2}$ son ortogonales y $\varphi(\mathbf{u}_{1}) \in \mathbb{R}^{n}$.`,
+  String.raw`# Actividad 1
+
+**Ejercicio 1.** Suma de matrices
+
+$$A+B=\left(\begin{array}{ll}1 & 2 \\ 3 & 4\end{array}\right)+\left(\begin{array}{ll}5 & 6 \\ 7 & 8\end{array}\right)=\left(\begin{array}{ll}6 & 8 \\ 10 & 12\end{array}\right)$$
+
+**Ejercicio 2.** Determinante
+
+$$\left|\begin{array}{ll}1 & 2 \\ 3 & 4\end{array}\right|=1 \cdot 4-2 \cdot 3=-2$$`,
 ]

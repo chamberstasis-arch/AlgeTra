@@ -58,6 +58,14 @@ export function ReportView({ run }: { run: Run }) {
         <Stat label="Costo estimado" value={`US$ ${report.cost.estimatedUsd.toFixed(3)}`} hint={`${report.cost.mathpixCalls} llamadas`} />
       </div>
 
+      {report.answers.pagesWithReference > 0 && (
+        <p className="small">
+          <strong>Respuesta final frente a la base:</strong> la esperada aparece en la transcripción original en{' '}
+          {report.answers.foundInOriginal} de {report.answers.pagesWithReference} páginas con ejercicio asignado
+          {report.answers.mismatchInOriginal ? ` (${report.answers.mismatchInOriginal} con valor distinto: error del OCR o del alumno)` : ''}.
+        </p>
+      )}
+
       <div className="cols">
         <section>
           <h3>Fórmulas ({eq.total})</h3>
