@@ -22,6 +22,7 @@ Esta carpeta contiene entregables documentales agrupados para revisar, diseñar 
 16. [ART-015 — MVP funcional de transcripción con Mathpix (álgebra lineal)](./15-mvp-transcripcion-mathpix.md)
 17. [ART-016 — Base de actividades y verificación de la transcripción](./16-corpus-actividades-y-verificacion.md)
 18. [ART-017 — Gráficas de libreta y modelo de IA local (investigación)](./17-graficas-y-modelo-local.md)
+19. [ART-018 — Alternativas de OCR por precisión en matemática manuscrita](./18-alternativas-ocr-precision.md)
 
 ## Relación con la documentación normativa
 
