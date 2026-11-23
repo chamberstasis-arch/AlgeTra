@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.pnpm-store/
+
+# Datos locales del MVP (imágenes, transcripciones) y credenciales
+data/
+.env
+.env.*
+!.env.example
