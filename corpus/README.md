@@ -29,3 +29,11 @@ Reglas:
 - La interfaz muestra advertencias si falta la respuesta o no es evaluable.
 
 El archivo `ejemplo.md` solo ilustra el formato; bórralo al cargar las actividades reales.
+
+## Cargar las 32 actividades
+
+- **Un archivo por actividad:** `corpus/actividades/act-01.md` … `act-32.md` (el nombre no importa; manda el `id` del encabezado).
+- **Los PDF originales** van en `corpus/fuentes/` (no se versionan). De ahí se convierten a `.md`; el sistema solo lee `corpus/actividades/`.
+- Un solo `.md` con las 32 **no funciona**: el sistema espera un `id` y una lista de ejercicios por archivo.
+- Ejercicio con incisos: un solo `## Ejercicio N` con los incisos dentro del enunciado (`a)`, `b)`…); la respuesta lleva una fórmula por inciso, en orden.
+- Si el PDF no trae respuestas, deja el ejercicio sin `**Respuesta:**`: sirve igual para identificar y ordenar; solo se pierde la verificación del resultado final (saldrá una advertencia).

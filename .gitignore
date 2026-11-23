@@ -22,3 +22,7 @@ trabajo/revision/*
 trabajo/entregas/*
 trabajo/metricas.md
 !trabajo/*/.gitkeep
+
+# PDFs originales de las actividades del docente (material de terceros)
+corpus/fuentes/*
+!corpus/fuentes/.gitkeep
