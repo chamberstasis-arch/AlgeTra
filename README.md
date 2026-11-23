@@ -39,6 +39,16 @@ Pasos según la documentación de Mathpix ([crear una API key](https://mathpix.c
 2. Con el servidor en marcha (`pnpm dev:all`): `pnpm probar pruebas/capturas --max 3` muestra el costo estimado, pide confirmación, reduce las fotos grandes (necesita ImageMagick) y crea una prueba visible en la interfaz. Opciones: `--sin-layout` (para comparar con y sin *modo página completa*), `--nombre "Lote 1"`, `--yes`.
 3. Empieza con 3 fotos, revisa el resultado y amplía el lote.
 
+## Modo agente (harness)
+
+Alternativa a la aplicación: un **agente de IA** hace de trabajador y tú lo supervisas. Detalle y límites en [`ART-019`](docs/artefactos/19-entorno-agente-transcriptor.md).
+
+1. Deja las fotos en `trabajo/por_procesar/`.
+2. Abre tu herramienta de agentes en la raíz del repo y pídele: *"Lee `harness/INSTRUCCIONES.md` y `harness/APRENDIZAJES.md` y procesa la siguiente hoja"* (la skill `transcribir-libreta` y `AGENTS.md`/`QWEN.md` apuntan al mismo manual).
+3. El agente usa `pnpm harness siguiente → validar → cerrar`. Las hojas limpias quedan en `trabajo/procesadas/`; las que tengan `[?]`, dudas o gráficas, en `trabajo/revision/`, con su `documento.docx`.
+4. Tú revisas: editas `transcripcion.md` si hace falta y ejecutas `pnpm harness aprobar <id>` (regenera el DOCX con tu versión y mide al agente). Si algo se repite, `pnpm harness aprender "regla"` para que no vuelva a ocurrir. `pnpm harness reabrir <id>` devuelve una hoja al agente.
+5. `pnpm harness medir` resume la exactitud sobre las hojas aprobadas.
+
 ## Flujo de uso
 
 1. **+ Nueva prueba** (opcional: desactivar *modo página completa* para comparar).

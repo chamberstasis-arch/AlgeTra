@@ -13,3 +13,11 @@ data/
 # Fotos de libretas de terceros: nunca al repositorio
 pruebas/capturas/*
 !pruebas/capturas/README.md
+
+# Entorno del agente: hojas y resultados nunca al repositorio
+trabajo/por_procesar/*
+trabajo/en_proceso/*
+trabajo/procesadas/*
+trabajo/revision/*
+trabajo/metricas.md
+!trabajo/*/.gitkeep

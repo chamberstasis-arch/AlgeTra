@@ -15,7 +15,8 @@
     "dev:mock": "MATHPIX_MOCK=1 concurrently -k -n api,web -c blue,green \"pnpm dev:server\" \"pnpm dev\"",
     "test": "vitest run",
     "mathpix:check": "tsx scripts/check-mathpix.ts",
-    "probar": "tsx scripts/probar.ts"
+    "probar": "tsx scripts/probar.ts",
+    "harness": "tsx scripts/harness.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.9",
