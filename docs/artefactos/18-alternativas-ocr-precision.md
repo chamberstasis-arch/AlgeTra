@@ -49,3 +49,20 @@ Una fuente indica que la pérdida de **estructura 2D y delimitadores** es la cat
 - Métricas existentes (fórmulas exactas, error de tokens, CER) más dos nuevas: **celdas de matriz correctas** y **dimensión de matriz correcta**.
 - Medir también el **consenso**: de las celdas en desacuerdo entre dos lectores, cuántas eran error real, y cuántos errores reales quedaron sin señalar.
 - Reportar la incertidumbre: con pocas fotos las diferencias entre modelos cercanos no son concluyentes.
+
+## 5. Alibaba Cloud Model Studio (consultado 2026-11-22)
+
+**La página de campaña [AI Token Plans](https://www.alibabacloud.com/es/campaign/ai-landing-page-token) no vende "20,000 tokens por US$ 3".** Vende suscripciones mensuales en **Credits**, sin tabla de conversión a tokens:
+
+| Plan individual | Mensual | Credits/mes |
+| --- | --- | --- |
+| Lite | US$ 6 | 11,500 |
+| Essential | US$ 10 | 25,500 |
+| Standard | US$ 18 | 45,000 |
+| Pro | US$ 68 | 180,000 |
+
+Cupón de nuevo usuario: US$ 2 de descuento, pedido mínimo US$ 5, vence 14 días tras canjearlo. Los planes se describen por "agentes concurrentes"; **no se verificó si permiten uso programático desde una aplicación** (ver su guía del plan individual).
+
+Pago por uso (aparte del plan): Qwen3-VL-Plus listado en US$ 0.2–0.6 por millón de tokens de entrada y 1.6–4.8 de salida; `qwen-vl-ocr` con cifras contradictorias entre páginas (US$ 0.72 o US$ 0.07/0.16 por millón en Singapur) y cuota gratuita de 1 M de tokens por 90 días al activar Model Studio (según la documentación; verificar en la consola). Modelos con visión: Qwen3-VL (Plus/Flash), `qwen-vl-ocr` (manuscrito, exámenes, tablas; **no se confirmó salida LaTeX de fórmulas**), `qwen3.5-ocr` (según algunas páginas) y la serie Qwen3.6/3.7/3.8. No aparece ningún "Qwen4".
+
+Privacidad (modo Internacional, Singapur): Alibaba declara no usar los datos para entrenar; la retención por defecto no está confirmada en fuentes oficiales; existe Zero Data Retention solo para clientes empresariales; contenido marcado por filtros puede conservarse hasta 2 años (página en chino tradicional). El cumplimiento legal del procesamiento transfronterizo es responsabilidad del cliente.
