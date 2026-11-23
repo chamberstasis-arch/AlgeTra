@@ -1,0 +1,2651 @@
+openapi: 3.1.0
+info:
+  title: AlgeTra API
+  version: 0.1.0-mvp
+  summary: API pública de la rebanada vertical MVP-0
+  description: |
+    Contrato orientativo para convertir de una a tres imágenes manuscritas en un
+    documento revisable y exportable a PDF.
+
+    Este contrato separa originales, variantes, resultado bruto de proveedor,
+    transcripción canónica, ediciones humanas y exportaciones. Mathpix no es
+    visible para el navegador: se consume mediante un adaptador en el worker
+    OCR descrito en `docs/api/processing-provider-contract.md` y
+    `docs/api/mathpix-adapter-contract.md`. El cliente solicita perfiles
+    lógicos; el backend selecciona proveedores compatibles.
+
+    El contrato aún no representa un backend desplegado. Los servidores de
+    ejemplo son intencionalmente `.invalid`.
+  contact:
+    name: Equipo AlgeTra
+  license:
+    name: Proprietary
+    identifier: proprietary
+servers:
+  - url: https://api.algetra.example.invalid
+    description: Servidor de evaluación (placeholder)
+  - url: http://localhost:8000
+    description: API local FastAPI
+tags:
+  - name: Identity
+    description: Principal autenticado y espacio privado.
+  - name: Documents
+    description: Documentos, páginas y ciclo de vida.
+  - name: Assets
+    description: Activos, cargas directas y procedencia.
+  - name: Quality
+    description: Puerta de calidad y variantes no destructivas.
+  - name: Processing
+    description: Trabajos durables, reintentos y eventos SSE.
+  - name: Review
+    description: Bloques canónicos, ambigüedades y decisiones humanas.
+  - name: Composition
+    description: Versiones, preview, exportación y PDF.
+  - name: Operations
+    description: Salud y métricas internas.
+x-tagGroups:
+  - name: Usuario
+    tags:
+      - Identity
+      - Documents
+      - Assets
+      - Quality
+      - Processing
+      - Review
+      - Composition
+  - name: Operación
+    tags:
+      - Operations
+externalDocs:
+  description: Contrato interno de procesamiento multi-proveedor
+  url: ./processing-provider-contract.md
+security:
+  - bearerAuth: []
+paths:
+  /v1/me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentPrincipal
+      summary: Obtener el principal actual
+      description: La identidad procede del proveedor OIDC gestionado; no hay contraseñas propias.
+      responses:
+        '200':
+          description: Principal y capacidades del espacio privado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrincipalResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/me/usage:
+    get:
+      tags: [Identity]
+      operationId: getCurrentUsage
+      summary: Consultar consumo del piloto
+      responses:
+        '200':
+          description: Consumo agregado sin contenido académico.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/documents:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: Listar documentos propios
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          description: Filtrar por estado del documento.
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+        - name: q
+          in: query
+          description: Búsqueda acotada por título, sin búsqueda en contenido manuscrito.
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        '200':
+          description: Página de documentos autorizados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Documents]
+      operationId: createDocument
+      summary: Crear un documento
+      description: Crea un borrador sin esperar carga ni OCR.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+            example:
+              title: Tarea de álgebra · Semana 4
+              language: es
+              page_limit: 3
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '201':
+          description: Documento creado.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Obtener un documento
+      responses:
+        '200':
+          description: Snapshot autorizado del documento.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Documents]
+      operationId: updateDocument
+      summary: Renombrar, archivar o actualizar metadatos
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Documento actualizado.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Revocar y programar la purga de un documento
+      description: La revocación es inmediata; la eliminación física es asíncrona y auditable.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '202':
+          description: Purga aceptada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurgeAcceptedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+
+  /v1/documents/{documentId}/pages:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: listPages
+      summary: Listar páginas ordenadas
+      responses:
+        '200':
+          description: Páginas del documento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Assets]
+      operationId: createPageUpload
+      summary: Registrar página y obtener carga firmada
+      description: No recibe el binario. Devuelve una instrucción de carga directa a S3/MinIO.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePageRequest'
+            example:
+              position: 1
+              file_name: pagina-01.png
+              content_type: image/png
+              byte_size: 1843200
+              sha256: 9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c9c1f2c
+      responses:
+        '201':
+          description: Página pendiente y URL de carga creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUploadResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/documents/{documentId}/pages/order:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    patch:
+      tags: [Documents]
+      operationId: reorderPages
+      summary: Confirmar el orden de páginas
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderPagesRequest'
+      responses:
+        '200':
+          description: Orden actualizado.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/documents/{documentId}/jobs:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Processing]
+      operationId: listDocumentJobs
+      summary: Recuperar trabajos del documento
+      responses:
+        '200':
+          description: Trabajos actuales y recientes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Processing]
+      operationId: createDocumentJob
+      summary: Crear un trabajo durable de procesamiento
+      description: Responde antes de finalizar y solo admite páginas con calidad aceptable o recuperable. `processor_profile` identifica una capacidad lógica; nunca es un identificador de proveedor.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+            example:
+              page_ids: [page_01JALGETRA01, page_01JALGETRA02]
+              variant_policy: quality-approved
+              processor_profile: ocr-stem-v1
+              queue: ocr-interactive
+              schema_version: '1.0'
+      responses:
+        '202':
+          description: Trabajo durable creado y encolado.
+          headers:
+            Location:
+              description: URL del snapshot del trabajo.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          description: Puerta de calidad o estado de página bloqueante.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                qualityGate:
+                  value:
+                    error:
+                      code: quality_gate_blocked
+                      message: Una página requiere recaptura antes de OCR.
+                      status: 422
+                      retryable: false
+                      request_id: req_01JALGETRA01
+                      details:
+                        page_id: page_01JALGETRA01
+                        issues: [blur_critical]
+
+  /v1/documents/{documentId}/blocks:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Review]
+      operationId: listDocumentBlocks
+      summary: Listar bloques canónicos
+      parameters:
+        - name: page_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/PageId'
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/BlockType'
+        - name: review_status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReviewStatus'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Bloques autorizados y su procedencia resumida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/documents/{documentId}/ambiguities:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Review]
+      operationId: listAmbiguities
+      summary: Obtener la cola de ambigüedades
+      parameters:
+        - name: page_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/PageId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Ambigüedades pendientes ordenadas para revisión.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbiguityListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/documents/{documentId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Composition]
+      operationId: listVersions
+      summary: Listar versiones recuperables
+      responses:
+        '200':
+          description: Versiones del documento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Composition]
+      operationId: createVersion
+      summary: Guardar una versión del documento
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+      responses:
+        '201':
+          description: Versión creada sin modificar la transcripción bruta.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/documents/{documentId}/previews:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Composition]
+      operationId: createPreview
+      summary: Solicitar una vista previa paginada
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePreviewRequest'
+      responses:
+        '202':
+          description: Preview en cola o regenerándose.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewResponse'
+        '200':
+          description: Preview reutilizada desde caché válida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/documents/{documentId}/exports:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Composition]
+      operationId: createExport
+      summary: Generar un PDF trazable
+      description: El PDF se genera desde una versión canónica y una plantilla, nunca desde OCR bruto.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExportRequest'
+            example:
+              version_id: ver_01JALGETRA01
+              template_id: academic-clean-v1
+              options:
+                page_size: A4
+                orientation: portrait
+              confirm_warnings: [preserved_figure_01]
+      responses:
+        '202':
+          description: Exportación en cola.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/pages/{pageId}:
+    parameters:
+      - $ref: '#/components/parameters/PageId'
+    patch:
+      tags: [Documents]
+      operationId: updatePage
+      summary: Actualizar captura o metadatos de una página
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePageRequest'
+      responses:
+        '200':
+          description: Página actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+    delete:
+      tags: [Documents]
+      operationId: deletePage
+      summary: Retirar una página
+      responses:
+        '204':
+          description: Página retirada.
+        '202':
+          description: Retirada programada porque la página tiene activos en purga.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionAcceptedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+
+  /v1/pages/{pageId}/quality:
+    parameters:
+      - $ref: '#/components/parameters/PageId'
+    get:
+      tags: [Quality]
+      operationId: getPageQuality
+      summary: Obtener diagnóstico de calidad
+      responses:
+        '200':
+          description: Última decisión autoritativa de calidad.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Quality]
+      operationId: evaluatePageQuality
+      summary: Ejecutar la puerta de calidad
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QualityRequest'
+      responses:
+        '200':
+          description: Resultado disponible de forma síncrona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityResponse'
+        '202':
+          description: Diagnóstico en cola.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/pages/{pageId}/variants:
+    parameters:
+      - $ref: '#/components/parameters/PageId'
+    get:
+      tags: [Quality]
+      operationId: listPageVariants
+      summary: Listar variantes derivadas
+      responses:
+        '200':
+          description: Variantes con transformación y selección.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Quality]
+      operationId: createPageVariant
+      summary: Crear una variante no destructiva
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVariantRequest'
+      responses:
+        '202':
+          description: Variante en generación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/assets/{assetId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    post:
+      tags: [Assets]
+      operationId: completeAssetUpload
+      summary: Confirmar una carga directa
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteUploadRequest'
+      responses:
+        '200':
+          description: Activo confirmado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/assets/{assetId}/download-url:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    post:
+      tags: [Assets]
+      operationId: createAssetDownloadUrl
+      summary: Crear una URL firmada temporal
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadUrlRequest'
+      responses:
+        '201':
+          description: URL autorizada para una operación concreta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedUrlResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+
+  /v1/jobs/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Processing]
+      operationId: getJob
+      summary: Obtener snapshot durable de un trabajo
+      responses:
+        '200':
+          description: Estado y pasos del trabajo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/jobs/{jobId}/retry:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Processing]
+      operationId: retryJob
+      summary: Reintentar un paso elegible
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryJobRequest'
+      responses:
+        '202':
+          description: Reintento aceptado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/jobs/{jobId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Processing]
+      operationId: cancelJob
+      summary: Solicitar cancelación de un trabajo
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Cancelación solicitada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+
+  /v1/jobs/{jobId}/events:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Processing]
+      operationId: streamJobEvents
+      summary: Recibir progreso por SSE o recuperar eventos por polling
+      description: |
+        Con `Accept: text/event-stream` mantiene una conexión SSE. Con
+        `Accept: application/json` devuelve los eventos posteriores al cursor.
+        El cliente debe enviar `Last-Event-ID` al reconectar.
+      parameters:
+        - name: after_event_id
+          in: query
+          description: Cursor para el modo JSON de recuperación.
+          schema:
+            $ref: '#/components/schemas/EventId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+        - name: Last-Event-ID
+          in: header
+          description: Último evento recibido en una reconexión SSE.
+          schema:
+            $ref: '#/components/schemas/EventId'
+      responses:
+        '200':
+          description: Eventos del trabajo.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |-
+                  id: evt_00043
+                  event: page.result.available
+                  data: {"job_id":"job_01J...","page_id":"page_01J...","scope":"page","status":"partial"}
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/jobs/{jobId}/partial-results:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Processing]
+      operationId: getPartialResults
+      summary: Recuperar resultados parciales reales
+      responses:
+        '200':
+          description: Resultado disponible hasta el último snapshot durable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartialResultsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/blocks/{blockId}:
+    parameters:
+      - $ref: '#/components/parameters/BlockId'
+    get:
+      tags: [Review]
+      operationId: getBlock
+      summary: Obtener un bloque y sus capas
+      responses:
+        '200':
+          description: Bloque canónico autorizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Review]
+      operationId: updateBlock
+      summary: Editar contenido o clasificación permitida
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBlockRequest'
+      responses:
+        '200':
+          description: Edición humana persistida como capa separada.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/blocks/{blockId}/source:
+    parameters:
+      - $ref: '#/components/parameters/BlockId'
+    get:
+      tags: [Review]
+      operationId: getBlockSource
+      summary: Obtener recorte y geometría de origen
+      responses:
+        '200':
+          description: Recorte temporal y procedencia autorizados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockSourceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/blocks/{blockId}/decisions:
+    parameters:
+      - $ref: '#/components/parameters/BlockId'
+    post:
+      tags: [Review]
+      operationId: decideBlock
+      summary: Confirmar o editar una ambigüedad
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockDecisionRequest'
+      responses:
+        '201':
+          description: Decisión humana registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/versions/{versionId}:
+    parameters:
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [Composition]
+      operationId: getVersion
+      summary: Obtener una versión canónica
+      responses:
+        '200':
+          description: Versión inmutable de composición.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/documents/{documentId}/preview:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Composition]
+      operationId: getDocumentPreview
+      summary: Recuperar la preview activa
+      parameters:
+        - name: version_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/VersionId'
+      responses:
+        '200':
+          description: Snapshot paginado de la preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/exports/{exportId}:
+    parameters:
+      - $ref: '#/components/parameters/ExportId'
+    get:
+      tags: [Composition]
+      operationId: getExport
+      summary: Consultar una exportación
+      responses:
+        '200':
+          description: Estado y trazabilidad del PDF.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/exports/{exportId}/download:
+    parameters:
+      - $ref: '#/components/parameters/ExportId'
+    post:
+      tags: [Composition]
+      operationId: createExportDownloadUrl
+      summary: Obtener descarga temporal del PDF
+      responses:
+        '201':
+          description: URL de descarga autorizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedUrlResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+
+  /healthz:
+    get:
+      tags: [Operations]
+      operationId: healthz
+      summary: Liveness
+      security: []
+      responses:
+        '200':
+          description: Proceso vivo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Proceso no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '400':
+          description: Solicitud inválida al endpoint de liveness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /readyz:
+    get:
+      tags: [Operations]
+      operationId: readyz
+      summary: Readiness
+      security: []
+      responses:
+        '200':
+          description: Dependencias mínimas disponibles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: No listo para admitir tráfico.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '400':
+          description: Solicitud inválida al endpoint de readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token emitido por el proveedor OIDC gestionado del piloto.
+  headers:
+    ETag:
+      description: Versión fuerte del recurso para `If-Match`.
+      schema:
+        type: string
+        example: '"doc-v3-7d8e"'
+  parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Correlación aportada por el cliente o generada por la API.
+      schema:
+        $ref: '#/components/schemas/RequestId'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Clave estable para repetir un comando sin duplicar efectos.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag leído por el cliente antes de mutar.
+      schema:
+        type: string
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 512
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/DocumentId'
+    PageId:
+      name: pageId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PageId'
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/AssetId'
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/JobId'
+    BlockId:
+      name: blockId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/BlockId'
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/VersionId'
+    ExportId:
+      name: exportId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ExportId'
+  responses:
+    BadRequest:
+      description: Solicitud malformada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Token ausente, inválido o expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Recurso inexistente o no visible para el principal.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Gone:
+      description: URL firmada o recurso temporal expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationError:
+      description: Regla de negocio o esquema inválido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    VersionConflict:
+      description: El recurso cambió después de la lectura del cliente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyConflict:
+      description: La misma clave se usó con un cuerpo incompatible.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    StateConflict:
+      description: La operación no está permitida en el estado actual.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: Tamaño de archivo o solicitud fuera del límite.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: Tipo MIME no admitido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    RequestId:
+      type: string
+      pattern: '^req_[A-Za-z0-9_-]{8,}$'
+      example: req_01JALGETRA01
+    EventId:
+      type: string
+      pattern: '^evt_[A-Za-z0-9_-]{8,}$'
+      example: evt_01JALGETRA01
+    DocumentId:
+      type: string
+      pattern: '^doc_[A-Za-z0-9_-]{8,}$'
+      example: doc_01JALGETRA01
+    PageId:
+      type: string
+      pattern: '^page_[A-Za-z0-9_-]{8,}$'
+      example: page_01JALGETRA01
+    AssetId:
+      type: string
+      pattern: '^asset_[A-Za-z0-9_-]{8,}$'
+      example: asset_01JALGETRA01
+    JobId:
+      type: string
+      pattern: '^job_[A-Za-z0-9_-]{8,}$'
+      example: job_01JALGETRA01
+    StepId:
+      type: string
+      pattern: '^step_[A-Za-z0-9_-]{8,}$'
+      example: step_01JALGETRA01
+    BlockId:
+      type: string
+      pattern: '^block_[A-Za-z0-9_-]{8,}$'
+      example: block_01JALGETRA01
+    VersionId:
+      type: string
+      pattern: '^ver_[A-Za-z0-9_-]{8,}$'
+      example: ver_01JALGETRA01
+    ExportId:
+      type: string
+      pattern: '^export_[A-Za-z0-9_-]{8,}$'
+      example: export_01JALGETRA01
+    PreviewId:
+      type: string
+      pattern: '^preview_[A-Za-z0-9_-]{8,}$'
+      example: preview_01JALGETRA01
+    Timestamp:
+      type: string
+      format: date-time
+      example: '2026-11-05T18:30:00Z'
+    DocumentStatus:
+      type: string
+      enum: [draft, uploading, processing, partial, review, ready_for_export, exporting, exported, error, deleting, deleted]
+    PageStatus:
+      type: string
+      enum: [local, pending_upload, uploaded, quality_checking, quality_blocked, accepted, processing, partial, ready, error, manual]
+    JobStatus:
+      type: string
+      enum: [queued, running, partial, retryable_error, completed, cancel_requested, cancelled, failed]
+    StepStatus:
+      type: string
+      enum: [queued, running, succeeded, retryable_error, failed, skipped, cancelled]
+    BlockType:
+      type: string
+      enum: [heading, paragraph, equation, figure, unknown]
+    ReviewStatus:
+      type: string
+      enum: [pending, confirmed, ambiguous, edited, preserved_visual, unknown]
+    QualityDecision:
+      type: string
+      enum: [pending, acceptable, recoverable, critical]
+    QualitySeverity:
+      type: string
+      enum: [info, warning, critical]
+    ContentFormat:
+      type: string
+      enum: [plain_text, mathpix_markdown, latex, html, image_reference]
+    CreateDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        language:
+          type: string
+          enum: [es]
+          default: es
+        page_limit:
+          type: integer
+          minimum: 1
+          maximum: 3
+          default: 3
+    UpdateDocumentRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        lifecycle_action:
+          type: string
+          enum: [archive, unarchive]
+        metadata:
+          type: object
+          additionalProperties: false
+          properties:
+            subject:
+              type: string
+              maxLength: 120
+            student_name:
+              type: string
+              maxLength: 160
+    CreatePageRequest:
+      type: object
+      additionalProperties: false
+      required: [position, file_name, content_type, byte_size, sha256]
+      properties:
+        position:
+          type: integer
+          minimum: 1
+          maximum: 3
+        file_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        content_type:
+          type: string
+          enum: [image/jpeg, image/png]
+        byte_size:
+          type: integer
+          minimum: 1
+          maximum: 15728640
+        sha256:
+          type: string
+          minLength: 32
+          maxLength: 128
+    UpdatePageRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        rotation_degrees:
+          type: integer
+          enum: [0, 90, 180, -90]
+        position:
+          type: integer
+          minimum: 1
+          maximum: 3
+    ReorderPagesRequest:
+      type: object
+      additionalProperties: false
+      required: [page_ids]
+      properties:
+        page_ids:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/PageId'
+    CompleteUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [sha256]
+      properties:
+        sha256:
+          type: string
+          minLength: 32
+          maxLength: 128
+        byte_size:
+          type: integer
+          minimum: 1
+          maximum: 15728640
+    DownloadUrlRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose]
+      properties:
+        purpose:
+          type: string
+          enum: [source_review, original_download, variant_review, export_download]
+        expires_in_seconds:
+          type: integer
+          minimum: 30
+          maximum: 900
+          default: 300
+    QualityRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        variant_id:
+          type: string
+          pattern: '^variant_[A-Za-z0-9_-]{8,}$'
+        force:
+          type: boolean
+          default: false
+    CreateVariantRequest:
+      type: object
+      additionalProperties: false
+      required: [transformation]
+      properties:
+        transformation:
+          type: string
+          enum: [normalize_orientation, perspective_correction, local_contrast, illumination_correction, resize]
+        parameters:
+          type: object
+          additionalProperties: true
+    ProcessorProfile:
+      type: string
+      enum: [ocr-stem-v1, ocr-general-v1, layout-analysis-v1, manual-v1]
+      description: Perfil lógico de capacidades; la selección del tercero ocurre en el worker.
+      example: ocr-stem-v1
+    ProcessingExecutionPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        allow_fallback:
+          type: boolean
+          default: true
+          description: Permite cambiar a otro adapter compatible sin que el cliente elija el proveedor.
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        budget_class:
+          type: string
+          enum: [interactive, pilot, offline]
+          default: interactive
+        required_capabilities:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [handwriting, math, layout, line_geometry, confidence, table_detection, language_es]
+    ProcessingOptions:
+      type: object
+      additionalProperties: false
+      properties:
+        locale:
+          type: string
+          enum: [es, en]
+          default: es
+        document_layout:
+          type: boolean
+          default: true
+        include_geometry:
+          type: boolean
+          default: true
+        include_confidence:
+          type: boolean
+          default: true
+        preserve_visual_regions:
+          type: boolean
+          default: true
+        output_formats:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [plain_text, latex, math_markdown, structured_data]
+          default: [plain_text, latex]
+    CreateJobRequest:
+      type: object
+      additionalProperties: false
+      required: [page_ids, variant_policy, processor_profile, schema_version]
+      properties:
+        page_ids:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/PageId'
+        variant_policy:
+          type: string
+          enum: [quality-approved, original-only, selected-variant]
+        processor_profile:
+          $ref: '#/components/schemas/ProcessorProfile'
+        queue:
+          type: string
+          enum: [ocr-interactive]
+          default: ocr-interactive
+        execution_policy:
+          $ref: '#/components/schemas/ProcessingExecutionPolicy'
+        schema_version:
+          type: string
+          enum: ['1.0']
+        options:
+          $ref: '#/components/schemas/ProcessingOptions'
+    RetryJobRequest:
+      type: object
+      additionalProperties: false
+      required: [step_id]
+      properties:
+        step_id:
+          $ref: '#/components/schemas/StepId'
+        reason:
+          type: string
+          maxLength: 500
+    UpdateBlockRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        type:
+          $ref: '#/components/schemas/BlockType'
+        current_content:
+          $ref: '#/components/schemas/ContentLayer'
+        position:
+          type: integer
+          minimum: 0
+        note:
+          type: string
+          maxLength: 500
+    BlockDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [confirm, reject, edit, defer]
+        selected_content:
+          $ref: '#/components/schemas/ContentLayer'
+        note:
+          type: string
+          maxLength: 500
+    CreateVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [base_version_id]
+      properties:
+        base_version_id:
+          $ref: '#/components/schemas/VersionId'
+        message:
+          type: string
+          maxLength: 240
+        include_pending_warnings:
+          type: boolean
+          default: false
+    CreatePreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [version_id, template_id]
+      properties:
+        version_id:
+          $ref: '#/components/schemas/VersionId'
+        template_id:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9._-]{1,80}$'
+          example: academic-clean-v1
+        options:
+          $ref: '#/components/schemas/CompositionOptions'
+    CreateExportRequest:
+      type: object
+      additionalProperties: false
+      required: [version_id, template_id]
+      properties:
+        version_id:
+          $ref: '#/components/schemas/VersionId'
+        template_id:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9._-]{1,80}$'
+          example: academic-clean-v1
+        options:
+          $ref: '#/components/schemas/CompositionOptions'
+        confirm_warnings:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+    CompositionOptions:
+      type: object
+      additionalProperties: false
+      properties:
+        page_size:
+          type: string
+          enum: [A4, letter]
+          default: A4
+        orientation:
+          type: string
+          enum: [portrait, landscape]
+          default: portrait
+        margin_mm:
+          type: number
+          minimum: 0
+          maximum: 60
+          default: 20
+    PrincipalResponse:
+      type: object
+      required: [principal, workspace_scope, features]
+      properties:
+        principal:
+          $ref: '#/components/schemas/Principal'
+        workspace_scope:
+          $ref: '#/components/schemas/WorkspaceScope'
+        features:
+          $ref: '#/components/schemas/FeatureFlags'
+    Principal:
+      type: object
+      required: [id, display_name, role]
+      properties:
+        id:
+          type: string
+          example: principal_01JALGETRA01
+        display_name:
+          type: string
+          example: Evaluadora invitada
+        role:
+          type: string
+          enum: [invited_evaluator]
+    WorkspaceScope:
+      type: object
+      required: [scope_id, isolation]
+      properties:
+        scope_id:
+          type: string
+          example: private_01JALGETRA01
+        isolation:
+          type: string
+          enum: [private]
+    FeatureFlags:
+      type: object
+      additionalProperties: false
+      properties:
+        mathpix_ocr:
+          type: boolean
+        language_review:
+          type: boolean
+        math_validation:
+          type: boolean
+        export_pdf:
+          type: boolean
+        manual_mode:
+          type: boolean
+    UsageResponse:
+      type: object
+      required: [period, limits, usage]
+      properties:
+        period:
+          type: string
+          example: evaluation-2026-11
+        limits:
+          $ref: '#/components/schemas/UsageCounters'
+        usage:
+          $ref: '#/components/schemas/UsageCounters'
+    UsageCounters:
+      type: object
+      required: [pages, variants, provider_attempts, exports]
+      properties:
+        pages:
+          $ref: '#/components/schemas/Counter'
+        variants:
+          $ref: '#/components/schemas/Counter'
+        provider_attempts:
+          $ref: '#/components/schemas/Counter'
+        exports:
+          $ref: '#/components/schemas/Counter'
+    Counter:
+      type: object
+      required: [used, limit]
+      properties:
+        used:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 0
+    Document:
+      type: object
+      required: [id, title, status, language, page_limit, page_count, version, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/DocumentId'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        language:
+          type: string
+          enum: [es]
+        page_limit:
+          type: integer
+          minimum: 1
+          maximum: 3
+        page_count:
+          type: integer
+          minimum: 0
+          maximum: 3
+        pending_issues:
+          type: integer
+          minimum: 0
+        version:
+          $ref: '#/components/schemas/VersionSummary'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+        deletion:
+          $ref: '#/components/schemas/DeletionState'
+    DocumentSummary:
+      allOf:
+        - $ref: '#/components/schemas/Document'
+      description: Resumen usado en listados; el servidor puede omitir bloques pesados.
+    Page:
+      type: object
+      required: [id, document_id, position, status, content_type, original_asset_id]
+      properties:
+        id:
+          $ref: '#/components/schemas/PageId'
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        position:
+          type: integer
+          minimum: 1
+          maximum: 3
+        file_name:
+          type: string
+        content_type:
+          type: string
+          enum: [image/jpeg, image/png]
+        status:
+          $ref: '#/components/schemas/PageStatus'
+        original_asset_id:
+          $ref: '#/components/schemas/AssetId'
+        selected_variant_id:
+          type: [string, 'null']
+          pattern: '^variant_[A-Za-z0-9_-]{8,}$'
+        quality:
+          $ref: '#/components/schemas/QualitySummary'
+        block_count:
+          type: integer
+          minimum: 0
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    Asset:
+      type: object
+      required: [id, kind, content_type, byte_size, sha256, immutable, status]
+      properties:
+        id:
+          $ref: '#/components/schemas/AssetId'
+        kind:
+          type: string
+          enum: [original, variant, crop, raw_provider_result, preview, export]
+        content_type:
+          type: string
+        byte_size:
+          type: integer
+          minimum: 0
+        sha256:
+          type: string
+        immutable:
+          type: boolean
+        status:
+          type: string
+          enum: [pending_upload, available, deleted, expired]
+        derived_from_asset_id:
+          type: [string, 'null']
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    UploadInstruction:
+      type: object
+      required: [method, url, expires_at, headers]
+      properties:
+        method:
+          type: string
+          enum: [PUT, POST]
+        url:
+          type: string
+          format: uri
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        max_bytes:
+          type: integer
+          minimum: 1
+    QualitySummary:
+      type: object
+      required: [decision, checked_at]
+      properties:
+        decision:
+          $ref: '#/components/schemas/QualityDecision'
+        score:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+        checked_at:
+          $ref: '#/components/schemas/Timestamp'
+        critical_issue_count:
+          type: integer
+          minimum: 0
+    QualityAssessment:
+      allOf:
+        - $ref: '#/components/schemas/QualitySummary'
+        - type: object
+          required: [signals, allowed_actions, variant_policy]
+          properties:
+            signals:
+              type: array
+              items:
+                $ref: '#/components/schemas/QualitySignal'
+            allowed_actions:
+              type: array
+              items:
+                type: string
+                enum: [recapture, replace, create_variant, process, manual_mode]
+            variant_policy:
+              type: string
+              enum: [blocked, original_only, derived_allowed]
+    QualitySignal:
+      type: object
+      required: [code, severity, label, actionable]
+      properties:
+        code:
+          type: string
+          enum: [blur, exposure, crop, orientation, perspective, contrast, resolution]
+        severity:
+          $ref: '#/components/schemas/QualitySeverity'
+        label:
+          type: string
+        value:
+          type: [number, 'null']
+        actionable:
+          type: boolean
+        recommendation:
+          type: [string, 'null']
+    Variant:
+      type: object
+      required: [id, page_id, kind, status, transformation, source_asset_id]
+      properties:
+        id:
+          type: string
+          pattern: '^variant_[A-Za-z0-9_-]{8,}$'
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        kind:
+          type: string
+          enum: [normalized, contrast, illumination, perspective, resize]
+        status:
+          type: string
+          enum: [queued, processing, available, failed]
+        transformation:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        source_asset_id:
+          $ref: '#/components/schemas/AssetId'
+        selected_for_processing:
+          type: boolean
+        asset_id:
+          type: [string, 'null']
+    Geometry:
+      type: object
+      required: [space, polygon]
+      properties:
+        space:
+          type: string
+          enum: [normalized-page]
+        polygon:
+          type: array
+          minItems: 3
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+              minimum: 0
+              maximum: 1
+    SourceProvenance:
+      type: object
+      required: [page_id, asset_id, variant_id, geometry]
+      properties:
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        asset_id:
+          $ref: '#/components/schemas/AssetId'
+        variant_id:
+          type: [string, 'null']
+        crop_id:
+          type: [string, 'null']
+        geometry:
+          $ref: '#/components/schemas/Geometry'
+        transformation:
+          type: [string, 'null']
+    TranscriptionLayer:
+      type: object
+      required: [format, value, provider, confidence]
+      properties:
+        format:
+          $ref: '#/components/schemas/ContentFormat'
+        value:
+          type: string
+        provider:
+          type: string
+          example: mathpix
+        provider_request_id:
+          type: [string, 'null']
+        provider_version:
+          type: [string, 'null']
+        confidence:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+        confidence_rate:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+    ContentLayer:
+      type: object
+      required: [format, value]
+      properties:
+        format:
+          $ref: '#/components/schemas/ContentFormat'
+        value:
+          type: string
+    ReviewState:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        ambiguity:
+          type: [object, 'null']
+          properties:
+            reason:
+              type: string
+            alternatives:
+              type: array
+              items:
+                $ref: '#/components/schemas/ContentLayer'
+        last_decision_id:
+          type: [string, 'null']
+    Block:
+      type: object
+      required: [id, document_id, page_id, type, geometry, source, transcription, current_content, review, revision]
+      properties:
+        id:
+          $ref: '#/components/schemas/BlockId'
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        position:
+          type: integer
+          minimum: 0
+        type:
+          $ref: '#/components/schemas/BlockType'
+        geometry:
+          $ref: '#/components/schemas/Geometry'
+        source:
+          $ref: '#/components/schemas/SourceProvenance'
+        transcription:
+          $ref: '#/components/schemas/TranscriptionLayer'
+        current_content:
+          $ref: '#/components/schemas/ContentLayer'
+        review:
+          $ref: '#/components/schemas/ReviewState'
+        revision:
+          type: integer
+          minimum: 1
+        raw_result_ref:
+          type: [string, 'null']
+          description: Referencia interna a respuesta bruta; no es una URL pública.
+    Ambiguity:
+      type: object
+      required: [block_id, page_id, reason, status, confidence]
+      properties:
+        block_id:
+          $ref: '#/components/schemas/BlockId'
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, resolved, deferred]
+        confidence:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+        source:
+          $ref: '#/components/schemas/SourceProvenance'
+        current_content:
+          $ref: '#/components/schemas/ContentLayer'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentLayer'
+    BlockDecision:
+      type: object
+      required: [id, block_id, action, actor, created_at]
+      properties:
+        id:
+          type: string
+          pattern: '^decision_[A-Za-z0-9_-]{8,}$'
+        block_id:
+          $ref: '#/components/schemas/BlockId'
+        action:
+          type: string
+          enum: [confirm, reject, edit, defer]
+        actor:
+          type: string
+          example: principal_01JALGETRA01
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        version_id:
+          $ref: '#/components/schemas/VersionId'
+    VersionSummary:
+      type: object
+      required: [id, number, status, schema_version]
+      properties:
+        id:
+          $ref: '#/components/schemas/VersionId'
+        number:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [draft, saved, valid, superseded]
+        schema_version:
+          type: string
+          example: '1.0'
+        saved_at:
+          type: [string, 'null']
+          format: date-time
+    Version:
+      allOf:
+        - $ref: '#/components/schemas/VersionSummary'
+        - type: object
+          required: [document_id, block_count, pending_issues, created_at]
+          properties:
+            document_id:
+              $ref: '#/components/schemas/DocumentId'
+            block_count:
+              type: integer
+              minimum: 0
+            pending_issues:
+              type: integer
+              minimum: 0
+            message:
+              type: [string, 'null']
+            created_at:
+              $ref: '#/components/schemas/Timestamp'
+    JobStep:
+      type: object
+      required: [id, phase, status, attempt]
+      properties:
+        id:
+          $ref: '#/components/schemas/StepId'
+        phase:
+          type: string
+          enum: [quality, variant, segmentation, classification, ocr, normalization, persistence, export, purge]
+        status:
+          $ref: '#/components/schemas/StepStatus'
+        page_id:
+          type: [string, 'null']
+        attempt:
+          type: integer
+          minimum: 0
+        error:
+          type: [object, 'null']
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            retryable:
+              type: boolean
+        started_at:
+          type: [string, 'null']
+          format: date-time
+        finished_at:
+          type: [string, 'null']
+          format: date-time
+    Job:
+      type: object
+      required: [id, document_id, status, queue, processor_profile, page_ids, steps, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/JobId'
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        queue:
+          type: string
+          example: ocr-interactive
+        processor_profile:
+          $ref: '#/components/schemas/ProcessorProfile'
+        fallback_used:
+          type: boolean
+          description: Indica si el router tuvo que usar un adapter alternativo compatible.
+        routing_version:
+          type: [string, 'null']
+        page_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/PageId'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobStep'
+        event_cursor:
+          $ref: '#/components/schemas/EventId'
+        result_scope:
+          type: string
+          enum: [none, partial, complete]
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    JobEvent:
+      type: object
+      required: [id, type, job_id, status, occurred_at, snapshot_version]
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        type:
+          type: string
+          enum: [job.accepted, step.started, quality.completed, page.result.available, provider.fallback, provider.blocked, step.failed, job.completed, job.cancelled, heartbeat]
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        page_id:
+          type: [string, 'null']
+        step_id:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        scope:
+          type: string
+          enum: [job, page, block, step]
+        snapshot_version:
+          type: integer
+          minimum: 0
+        payload:
+          type: object
+          additionalProperties: true
+        occurred_at:
+          $ref: '#/components/schemas/Timestamp'
+    Preview:
+      type: object
+      required: [id, document_id, version_id, status, pages, warnings]
+      properties:
+        id:
+          $ref: '#/components/schemas/PreviewId'
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        version_id:
+          $ref: '#/components/schemas/VersionId'
+        status:
+          type: string
+          enum: [queued, rendering, ready, stale, failed]
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviewPage'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Warning'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    PreviewPage:
+      type: object
+      required: [number, status]
+      properties:
+        number:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [rendering, ready, failed]
+        image_url:
+          type: [string, 'null']
+          format: uri
+        block_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockId'
+    Warning:
+      type: object
+      required: [id, code, severity, message, blocking]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          enum: [ambiguous_block, preserved_figure, missing_field, stale_preview, page_error]
+        severity:
+          type: string
+          enum: [warning, error]
+        message:
+          type: string
+        blocking:
+          type: boolean
+        target_id:
+          type: [string, 'null']
+    Export:
+      type: object
+      required: [id, document_id, version_id, status, template_id, warnings, created_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/ExportId'
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        version_id:
+          $ref: '#/components/schemas/VersionId'
+        status:
+          type: string
+          enum: [queued, rendering, ready, warning_confirmation_required, failed, expired]
+        template_id:
+          type: string
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Warning'
+        asset_id:
+          type: [string, 'null']
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        completed_at:
+          type: [string, 'null']
+          format: date-time
+    DeletionState:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [scheduled, revoking, purging, complete, failed]
+        purge_job_id:
+          type: [string, 'null']
+        scheduled_at:
+          type: [string, 'null']
+          format: date-time
+    SignedUrl:
+      type: object
+      required: [url, method, expires_at]
+      properties:
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+          enum: [GET, PUT, POST]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    Problem:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, status, retryable, request_id]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            status:
+              type: integer
+            retryable:
+              type: boolean
+            request_id:
+              $ref: '#/components/schemas/RequestId'
+            details:
+              type: object
+              additionalProperties: true
+    Pagination:
+      type: object
+      required: [limit, has_more]
+      properties:
+        limit:
+          type: integer
+        next_cursor:
+          type: [string, 'null']
+        has_more:
+          type: boolean
+    DocumentListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    DocumentResponse:
+      type: object
+      required: [document]
+      properties:
+        document:
+          $ref: '#/components/schemas/Document'
+    PageListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+    PageResponse:
+      type: object
+      required: [page]
+      properties:
+        page:
+          $ref: '#/components/schemas/Page'
+    PageUploadResponse:
+      type: object
+      required: [page, asset, upload]
+      properties:
+        page:
+          $ref: '#/components/schemas/Page'
+        asset:
+          $ref: '#/components/schemas/Asset'
+        upload:
+          $ref: '#/components/schemas/UploadInstruction'
+    AssetResponse:
+      type: object
+      required: [asset]
+      properties:
+        asset:
+          $ref: '#/components/schemas/Asset'
+    SignedUrlResponse:
+      type: object
+      required: [download]
+      properties:
+        download:
+          $ref: '#/components/schemas/SignedUrl'
+    QualityResponse:
+      type: object
+      required: [page_id, assessment]
+      properties:
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        assessment:
+          $ref: '#/components/schemas/QualityAssessment'
+    VariantListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'
+    VariantResponse:
+      type: object
+      required: [variant]
+      properties:
+        variant:
+          $ref: '#/components/schemas/Variant'
+    JobResponse:
+      type: object
+      required: [job]
+      properties:
+        job:
+          $ref: '#/components/schemas/Job'
+    JobListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+    EventListResponse:
+      type: object
+      required: [items, next_event_id, snapshot_version]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobEvent'
+        next_event_id:
+          type: [string, 'null']
+        snapshot_version:
+          type: integer
+    PartialResultsResponse:
+      type: object
+      required: [job_id, scope, pages, complete]
+      properties:
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        scope:
+          type: string
+          enum: [partial, complete]
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Block'
+        complete:
+          type: boolean
+    BlockListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Block'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    BlockResponse:
+      type: object
+      required: [block]
+      properties:
+        block:
+          $ref: '#/components/schemas/Block'
+    BlockSourceResponse:
+      type: object
+      required: [block_id, source, crop]
+      properties:
+        block_id:
+          $ref: '#/components/schemas/BlockId'
+        source:
+          $ref: '#/components/schemas/SourceProvenance'
+        crop:
+          $ref: '#/components/schemas/SignedUrl'
+    AmbiguityListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ambiguity'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    DecisionResponse:
+      type: object
+      required: [decision, block]
+      properties:
+        decision:
+          $ref: '#/components/schemas/BlockDecision'
+        block:
+          $ref: '#/components/schemas/Block'
+    VersionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+    VersionResponse:
+      type: object
+      required: [version]
+      properties:
+        version:
+          $ref: '#/components/schemas/Version'
+    PreviewResponse:
+      type: object
+      required: [preview]
+      properties:
+        preview:
+          $ref: '#/components/schemas/Preview'
+    ExportResponse:
+      type: object
+      required: [export]
+      properties:
+        export:
+          $ref: '#/components/schemas/Export'
+    PurgeAcceptedResponse:
+      type: object
+      required: [document_id, status, purge_job_id, access_revoked_at]
+      properties:
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        status:
+          type: string
+          enum: [revoking, purging]
+        purge_job_id:
+          $ref: '#/components/schemas/JobId'
+        access_revoked_at:
+          $ref: '#/components/schemas/Timestamp'
+    DeletionAcceptedResponse:
+      type: object
+      required: [page_id, status]
+      properties:
+        page_id:
+          $ref: '#/components/schemas/PageId'
+        status:
+          type: string
+          enum: [deleting, purging]
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: algetra-api
+    ReadinessResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, degraded, failed]

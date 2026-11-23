@@ -158,6 +158,12 @@ Redimensionamiento, hash y análisis de imagen suficientemente costosos se ejecu
 
 El JSON de ProseMirror será una proyección editable. Un adaptador convertirá entre nodos de UI y nodos canónicos. De esta forma se podrá sustituir el editor o generar otros formatos sin migrar toda la lógica de negocio.
 
+### 6.6. Visor de imágenes como sub-sistema
+
+El visor se implementará como un componente frontend independiente de las pantallas de captura y revisión. Recibirá un `ImageViewerSource` abstracto —fixture, archivo local, object URL o URL firmada— y overlays con geometría normalizada. No conocerá Mathpix, S3/MinIO ni proveedores de procesamiento.
+
+Debe soportar fit/actual, zoom, pan, rotación visual, navegación, comparación, selección de overlays, estados de URL expirada y accesibilidad. El contraste, contrato y criterios de fluidez están documentados en [ART-011](./artefactos/11-contraste-ui-y-plan-de-mejoras.md).
+
 ## 7. Backend modular
 
 ### 7.1. Módulos propuestos
@@ -261,6 +267,12 @@ Celery transporta ejecución; PostgreSQL registra intención y estado. El patró
 5. Persiste resultado y evento antes de confirmar el mensaje.
 
 Esto reduce trabajos “fantasma” creados en base pero nunca encolados, o encolados sin estado de negocio.
+
+### 8.4. Procesamiento multi-proveedor
+
+El trabajo público solicita un `processor_profile` lógico, como `ocr-stem-v1`; no selecciona Mathpix ni ningún tercero. Un router interno resuelve capacidades, política de datos, salud, presupuesto y rollout para elegir un `provider_descriptor`. Cada ejecución queda registrada como `provider_attempt` y pasa por un puerto `ProcessorAdapter` que devuelve un resultado normalizado antes de tocar el modelo canónico.
+
+Mathpix es el primer adapter, no una dependencia del dominio. Los futuros OCR, revisores lingüísticos, validadores matemáticos o servicios especializados entrarán mediante fixtures, pruebas de contrato, `shadow`, `canary`, `pilot` y `default`. El fallback, circuit breaker, costo, secretos y deprecación permanecen en backend. Véanse [ART-012](./artefactos/12-arquitectura-api-procesamiento-extensible.md) y el [contrato interno multi-proveedor](./api/processing-provider-contract.md).
 
 ## 9. Calidad y mejora de imagen
 

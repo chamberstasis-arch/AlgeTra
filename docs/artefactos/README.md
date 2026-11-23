@@ -12,6 +12,14 @@ Esta carpeta contiene entregables documentales agrupados para revisar, diseñar 
 6. [ART-006 — Feature Breakdown Structure](./05-feature-breakdown-structure.md)
 7. [ART-007 — Feature Model](./06-feature-model.md)
 8. [ADR-001 — Arquitectura de monolito modular escalable](./07-adr-001-arquitectura-monolito-modular.md)
+9. [ART-008 — MVP experimental del prototipo inicial](./08-mvp-prototipo-inicial.md)
+10. [ART-009 — Catálogo orientativo de endpoints del MVP-0](./09-catalogo-endpoints-mvp-0.md)
+11. [ART-010 — Contrato API y documentación Scalar del MVP-0](./10-contrato-api-mvp-0.md)
+12. [ART-011 — Contraste de la UI y plan de mejora del frontend](./11-contraste-ui-y-plan-de-mejoras.md)
+13. [ART-012 — Arquitectura de API y procesamiento extensible por terceros](./12-arquitectura-api-procesamiento-extensible.md)
+14. [ART-013 — Alcance separado de frontend y backend](./13-alcance-front-back-mvp.md)
+15. [ART-014 — Matriz versionable de evaluación OCR y proveedores](./14-matriz-evaluacion-ocr-y-proveedores.md)
+16. [ART-015 — MVP funcional de transcripción con Mathpix (álgebra lineal)](./15-mvp-transcripcion-mathpix.md)
 
 ## Relación con la documentación normativa
 
