@@ -50,19 +50,29 @@ Una fuente indica que la pérdida de **estructura 2D y delimitadores** es la cat
 - Medir también el **consenso**: de las celdas en desacuerdo entre dos lectores, cuántas eran error real, y cuántos errores reales quedaron sin señalar.
 - Reportar la incertidumbre: con pocas fotos las diferencias entre modelos cercanos no son concluyentes.
 
-## 5. Alibaba Cloud Model Studio (consultado 2026-11-22)
+## 5. Alibaba Cloud Model Studio — Token Plan (consultado 2026-11-22)
 
-**La página de campaña [AI Token Plans](https://www.alibabacloud.com/es/campaign/ai-landing-page-token) no vende "20,000 tokens por US$ 3".** Vende suscripciones mensuales en **Credits**, sin tabla de conversión a tokens:
+Fuentes: [página de campaña](https://www.alibabacloud.com/es/campaign/ai-landing-page-token) y la guía oficial del plan ([overview](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/token-plan-personal-overview), [permisos y uso](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/token-plan-permissions-and-usage), [cuotas](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/token-plan-usage-quota)). **Si difieren, manda la guía:** la campaña está desactualizada (mostraba Lite con 11,500 credits; la guía dice que las cuotas subieron el 9-nov-2026). *Corrección:* una versión anterior de esta sección decía que no existía "Qwen4"; sí existe (`qwen4-max`, con `qwen4-max-preview` hasta el 25-nov-2026).
 
-| Plan individual | Mensual | Credits/mes |
+**Planes (edición personal, solo región Singapur, modo de despliegue Global):**
+
+| Plan | Precio | Credits/mes |
 | --- | --- | --- |
-| Lite | US$ 6 | 11,500 |
-| Essential | US$ 10 | 25,500 |
-| Standard | US$ 18 | 45,000 |
-| Pro | US$ 68 | 180,000 |
+| Lite | US$ 6 (**US$ 3** de lanzamiento hasta el 30-nov-2026 23:59 UTC+8, solo quien nunca lo ha comprado) | 20,000 |
+| Essential | US$ 10 (US$ 5 de lanzamiento) | 45,000 |
+| Standard | US$ 18 | 80,000 |
+| Pro | US$ 43 | 200,000 |
 
-Cupón de nuevo usuario: US$ 2 de descuento, pedido mínimo US$ 5, vence 14 días tras canjearlo. Los planes se describen por "agentes concurrentes"; **no se verificó si permiten uso programático desde una aplicación** (ver su guía del plan individual).
+Un *credit* **no es un token** y varía por modelo; el único ejemplo oficial (edición de equipo, `qwen3.6-plus`) da ≈ 0.2 credits por 1,000 tokens de entrada y ≈ 1.2 por 1,000 de salida. Sin tabla por modelo ni por imagen.
 
-Pago por uso (aparte del plan): Qwen3-VL-Plus listado en US$ 0.2–0.6 por millón de tokens de entrada y 1.6–4.8 de salida; `qwen-vl-ocr` con cifras contradictorias entre páginas (US$ 0.72 o US$ 0.07/0.16 por millón en Singapur) y cuota gratuita de 1 M de tokens por 90 días al activar Model Studio (según la documentación; verificar en la consola). Modelos con visión: Qwen3-VL (Plus/Flash), `qwen-vl-ocr` (manuscrito, exámenes, tablas; **no se confirmó salida LaTeX de fórmulas**), `qwen3.5-ocr` (según algunas páginas) y la serie Qwen3.6/3.7/3.8. No aparece ningún "Qwen4".
+**Restricciones (citadas de la guía):**
 
-Privacidad (modo Internacional, Singapur): Alibaba declara no usar los datos para entrenar; la retención por defecto no está confirmada en fuentes oficiales; existe Zero Data Retention solo para clientes empresariales; contenido marcado por filtros puede conservarse hasta 2 años (página en chino tradicional). El cumplimiento legal del procesamiento transfronterizo es responsabilidad del cliente.
+- Solo uso **interactivo dentro de herramientas de programación/agentes** (Claude Code, Cursor, Qwen Code, Qoder, OpenClaw…). "No debe usarse para scripts de automatización, backends de aplicaciones propias ni llamadas por lotes no interactivas." Usarla así se considera infracción y puede suspender la suscripción o banear la clave.
+- Uso exclusivo del suscriptor; prohibido compartir la clave. Colaboración de varias personas → edición de equipo.
+- Clave dedicada `sk-sp-…` (no sirve la de pago por uso). Compatible con protocolos OpenAI y Anthropic.
+- Sin cancelación ni reembolso; solo se puede no renovar. Lo no usado no se acumula. Agotada la cuota, se bloquea (no cobra por uso). Límites de ritmo dinámicos y cola en horas pico; concurrencia recomendada 1–2 en Lite.
+- Datos: modo Global, con transferencia transfronteriza; la responsabilidad legal es del cliente.
+
+**Modelos con comprensión de imágenes en el plan:** `qwen4-max`, `qwen3.8-max`, `qwen3.8-flash`, `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4.1-flash`. **No están** Qwen3-VL ni `qwen-vl-ocr`.
+
+**Pago por uso (producto distinto, programable):** Qwen3-VL-Plus listado en US$ 0.2–0.6 por millón de tokens de entrada y 1.6–4.8 de salida; `qwen-vl-ocr` con precios contradictorios entre páginas. La cuota gratuita de nuevos usuarios (1 M de tokens por modelo, 90 días) aplica según la documentación a Singapur modo Internacional, una por cuenta; verificar en la consola.
