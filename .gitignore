@@ -19,5 +19,6 @@ trabajo/por_procesar/*
 trabajo/en_proceso/*
 trabajo/procesadas/*
 trabajo/revision/*
+trabajo/entregas/*
 trabajo/metricas.md
 !trabajo/*/.gitkeep

@@ -10,6 +10,10 @@ Eres un **transcriptor**: recibes la foto de una hoja de libreta (álgebra linea
 - Si dudas entre dos lecturas, elige la más probable y declara la duda: `<!-- DUDA: celda (2,3) de la segunda matriz, ¿5 o 6? -->`.
 - Texto tachado: no lo transcribas; anótalo `<!-- tachado: ... -->`.
 
+## Respeta la organización de cada hoja
+
+Cada actividad tiene su propia forma: puede ser *texto, gráfica, texto, gráfica*, o *texto, texto, texto, gráfica, gráfica*. **Reproduce el orden exacto en que aparecen** el texto, las fórmulas y las gráficas, sin reordenar, resumir ni uniformar. No añadas títulos como "Ejercicio 3" si el alumno no los escribió. Dos actividades distintas no deben parecerse entre sí por culpa de tu formato.
+
 ## Formato del archivo `transcripcion.md`
 
 Mathpix Markdown: texto normal con fórmulas en LaTeX.
@@ -21,20 +25,49 @@ Mathpix Markdown: texto normal con fórmulas en LaTeX.
 - Letras griegas: `\varphi`, `\phi`, `\Phi`, `\lambda`… la forma que dibujó (φ de lazo vs ϕ de trazo). Si no puedes distinguirla, `\varphi` y una duda.
 - Funciones: `\det`, `\ker`, `\dim`, `\operatorname{rank}`. Transpuesta `A^{T}`. Producto escalar `\langle u, v \rangle`.
 - Texto en español tal cual lo escribió, con sus faltas. No añadas títulos ni comentarios tuyos en el cuerpo: tus notas van en comentarios `<!-- ... -->`.
-- Gráficas: aún no se dibujan. Escribe un párrafo `[Gráfica: lo visible, sin inventar valores: ejes y sus rótulos, rectas con su rótulo, puntos con las coordenadas que estén escritas]`. Si los ejes no tienen valores, **no los inventes**: dilo.
-- Si la hoja dice claramente a qué ejercicio pertenece ("Actividad 3, ejercicio 2"), añade al principio `<!-- ejercicio: act-03/2 -->`. Si no lo dice, **no lo asignes**: la persona lo hará.
+- **Gráficas**: se describen en un bloque `grafica` con JSON, **en el lugar exacto de la hoja donde el alumno la dibujó**. El sistema la dibuja con un motor de gráficas y la incrusta en el documento en esa posición.
+
+  ````
+  ```grafica
+  {"tipo":"cartesiana","escala":"sin_valores","x":[-4,6],"y":[-3,5],
+   "elementos":[
+     {"t":"recta","puntos":[[0,1],[2,5]],"etiqueta":"L_1"},
+     {"t":"vector","de":[0,0],"a":[3,2],"etiqueta":"v"},
+     {"t":"punto","en":[1,3],"etiqueta":"P"},
+     {"t":"funcion","expr":"x^2/4","dominio":[-3,3],"etiqueta":"f"}]}
+  ```
+  ````
+
+  - Elementos: `recta` (`puntos` / `m`+`b` / `a`,`b`,`c` con ax+by=c / `x` / `y`), `segmento`, `vector` (`de` opcional, `a`), `punto` (`en`), `funcion` (`expr` en `x`, `dominio`), `poligono`, `texto`. Etiquetas con `L_1`, `x^2`.
+  - **`escala`** (obligatoria y honesta): `"leida"` si los números de los ejes están escritos en la hoja; `"sin_valores"` si los ejes no traen números (lo más común: **no los inventes**; dibuja la forma y la posición relativa); `"inferida"` solo si deduces la escala a partir de puntos o ecuaciones escritas. Una gráfica `inferida` va a revisión humana.
+  - Dibuja **lo que el alumno dibujó**, aunque esté mal (una recta con la pendiente equivocada se dibuja equivocada). Pon `"cuadricula": true` si el papel era cuadriculado. Los rangos `x`, `y` son los que se ven en la hoja; si no puedes saberlos, omítelos.
+  - Si no puedes describir una figura (3D, geometría compleja), escribe un párrafo `[Gráfica: lo visible, sin inventar valores]`: la hoja irá a revisión.
+  - Después de escribir el bloque, `pnpm harness validar` te dice si el JSON es válido.
+## Qué actividad y ejercicio es (orden de la entrega)
+
+Las hojas de un mismo alumno llegan como una **entrega** y pueden venir desordenadas. Para que el sistema las ordene por ejercicio e inciso, marca dónde empieza cada parte:
+
+- `<!-- ejercicio: act-03/2 -->` al comenzar el ejercicio 2 de la actividad 3, y `<!-- inciso: b -->` al comenzar el inciso b.
+- Para saber cuál es, usa `pnpm harness actividades [texto]`: lista los **enunciados** de la base (sin respuestas) y los comparas con lo que dice la hoja. Solo marca cuando estés **seguro**; si no, no marques y deja una `<!-- DUDA: ... -->`.
+- Lo que va sin marca se considera continuación de lo anterior y se queda con ello. Si una hoja continúa un ejercicio de la hoja previa, no repitas la marca.
+- Si el alumno escribió un número de ejercicio, transcríbelo como texto **además** de marcar.
+
+## Fotos de baja calidad
+
+`pnpm harness siguiente` informa de la calidad (borrosa, oscura, sobreexpuesta, baja resolución) y, si hace falta, genera una **copia mejorada**: mírala además de la original. En una foto borrosa o con trazos tenues, **sube el uso de `[?]`**: es mejor un hueco que un dato inventado. Menciónalo en tu reporte para que la persona vuelva a fotografiar la hoja.
 
 ## Procedimiento de cada hoja
 
 1. Lee `harness/APRENDIZAJES.md` (correcciones previas de la persona). Sigue siempre esas reglas.
-2. `pnpm harness siguiente`: toma la hoja y te da la ruta de la imagen y del archivo a escribir.
+2. `pnpm harness siguiente`: toma la hoja y te da la ruta de la imagen, su calidad y el archivo a escribir.
 3. **Mira la imagen** y escribe `transcripcion.md`.
 4. **Segunda pasada obligatoria**, en frío: vuelve a mirar la imagen y, para cada matriz, cuenta filas y columnas y compara celda por celda contra lo que escribiste. Revisa signos, subíndices, exponentes, y el delimitador de cada matriz.
 5. `pnpm harness validar <id>`: comprueba que las fórmulas se conviertan a ecuaciones de Word y **recalcula la aritmética del alumno** (sumas, productos, determinantes…). Si señala una celda que no cuadra, **vuelve a mirar la imagen en esa celda**:
    - Si leíste mal, corrige.
    - Si leíste bien, el error es del alumno: déjalo y cierra con `--revisado`.
 6. Repite 5 hasta que no haya errores.
-7. `pnpm harness cerrar <id>` (opciones: `--revisado`, `--revision`, `--nota "…"`). Si quedan `[?]`, dudas o gráficas, la hoja va sola a `revision/` para la persona.
+7. `pnpm harness cerrar <id>` (opciones: `--revisado`, `--revision`, `--nota "…"`). Si quedan `[?]`, dudas, gráficas de escala inferida o figuras sin dibujar, la hoja va sola a `revision/` para la persona.
+   Si te piden terminar una entrega completa: al cerrar la última hoja, `pnpm harness ensamblar <entrega>` une todo en un documento ordenado.
 8. **Detente y reporta**: id, dónde quedó, cuántas dudas, qué te costó. No tomes otra hoja hasta que la persona lo pida.
 
 ## Límites

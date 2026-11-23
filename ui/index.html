@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlgeTra · Entorno del agente</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#dfe3ea; --ink:#1d2330; --mut:#667085; --acc:#1f4e9c; --ok:#1e8449; --warn:#b9770e; --bad:#c0392b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  button, .btn { font:inherit; padding:6px 12px; border:1px solid var(--line); background:#fff; border-radius:7px; cursor:pointer; color:var(--ink); text-decoration:none; display:inline-block; }
+  button:hover, .btn:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
+  button:disabled { opacity:.5; cursor:default; }
+  main { padding:16px 20px 40px; max-width:1500px; margin:0 auto; }
+  section { margin-bottom:22px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--mut); margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .upload { display:grid; grid-template-columns:260px 1fr; gap:14px; align-items:stretch; }
+  .drop { border:2px dashed #b9c2d3; border-radius:10px; padding:18px; text-align:center; color:var(--mut); cursor:pointer; background:#fafbfd; }
+  .drop.over { border-color:var(--acc); background:#eef3fb; }
+  label { display:block; font-size:12px; color:var(--mut); margin-bottom:3px; }
+  input[type=text] { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .board { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; align-items:start; }
+  .col { background:#eceff4; border-radius:10px; padding:8px; min-height:80px; }
+  .col h3 { font-size:13px; margin:2px 4px 8px; display:flex; justify-content:space-between; }
+  .item { background:#fff; border:1px solid var(--line); border-radius:8px; padding:7px; margin-bottom:7px; cursor:pointer; display:flex; gap:8px; }
+  .item:hover { border-color:var(--acc); }
+  .item.sel { outline:2px solid var(--acc); }
+  .item img { width:42px; height:56px; object-fit:cover; border-radius:4px; background:#e5e8ee; flex:none; }
+  .item .t { min-width:0; flex:1; }
+  .item .n { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:#e7ebf3; color:#41506b; margin:2px 3px 0 0; }
+  .tag.ok { background:#dff3e6; color:#17653a; } .tag.warn { background:#fdf0d5; color:#8a5a06; } .tag.bad { background:#fadbd8; color:#922b21; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; color:var(--mut); font-weight:600; }
+  .detail { display:none; }
+  .detail.show { display:block; }
+  .tabs { display:flex; gap:6px; margin:8px 0; flex-wrap:wrap; }
+  .tabs button.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .view { background:#fff; border:1px solid var(--line); border-radius:8px; min-height:200px; }
+  .view img { max-width:100%; display:block; margin:0 auto; }
+  .view iframe { width:100%; height:78vh; border:0; }
+  pre { margin:0; padding:12px; white-space:pre-wrap; word-break:break-word; font:12.5px/1.5 ui-monospace, Consolas, monospace; max-height:78vh; overflow:auto; }
+  .muted { color:var(--mut); } .small { font-size:12px; }
+  .banner { padding:8px 12px; border-radius:8px; margin-bottom:10px; background:#fdf0d5; color:#6b4505; }
+  .msg { margin-top:8px; font-size:13px; } .msg .w { color:var(--warn); }
+  @media (max-width: 1000px) { .board { grid-template-columns:1fr 1fr; } .upload { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AlgeTra · Entorno del agente</h1>
+  <span class="muted small" id="sync">…</span>
+  <button id="btnPrompt" title="Texto para pegar en tu herramienta de agentes">Copiar prompt de inicio</button>
+</header>
+<main>
+  <div id="tools"></div>
+
+  <section>
+    <h2>Subir hojas</h2>
+    <div class="card upload">
+      <div>
+        <label for="entrega">Nombre de la entrega (una por alumno/actividad)</label>
+        <input type="text" id="entrega" placeholder="p. ej. act03_alumnoA">
+        <p class="muted small" style="margin:8px 0 0">Las hojas con el mismo nombre se ensamblan juntas, ordenadas por ejercicio e inciso.</p>
+      </div>
+      <div>
+        <div class="drop" id="drop">Arrastra aquí fotos, PDF o DOCX — o haz clic para elegir<br><span class="small">Todo se convierte a imágenes. JPG · PNG · WebP · HEIC · PDF · DOCX</span></div>
+        <input type="file" id="file" multiple hidden accept="image/*,.pdf,.docx,.doc,.odt,.rtf,.heic,.heif">
+        <div class="msg" id="upmsg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cola</h2>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section>
+    <h2>Entregas</h2>
+    <div class="card" id="entregas"><span class="muted">Aún no hay entregas.</span></div>
+  </section>
+
+  <section class="detail" id="detail">
+    <h2 id="dtitle">Detalle</h2>
+    <div class="card">
+      <div class="row" id="dactions"></div>
+      <div class="tabs" id="dtabs"></div>
+      <div class="view" id="dview"></div>
+      <p class="muted small" id="dnote"></p>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
+const q = (o) => new URLSearchParams(o).toString()
+const COLS = [['por_procesar','Por procesar'],['en_proceso','En proceso'],['procesadas','Procesadas'],['revision','Revisión']]
+let state = { hojas: [], entregas: [] }
+let sel = null // {kind:'hoja', estado, id} | {kind:'entrega', nombre}
+let tab = null
+
+const now = new Date(); const pad = (n) => String(n).padStart(2, '0')
+$('#entrega').value = `entrega-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+
+async function refresh() {
+  try {
+    state = await (await fetch('/api/estado')).json()
+    $('#sync').textContent = 'actualizado ' + new Date().toLocaleTimeString()
+    render()
+  } catch { $('#sync').textContent = 'sin conexión con el servidor' }
+}
+
+function badges(h) {
+  const out = []
+  const c = h.calidad
+  if (c) out.push(`<span class="tag ${c.nivel === 'ok' ? 'ok' : c.nivel === 'mala' ? 'bad' : 'warn'}" title="nitidez ${c.nitidez} · brillo ${c.brillo}">${c.nivel === 'ok' ? 'imagen ok' : esc(c.banderas.join(', ').replace(/_/g, ' '))}</span>`)
+  if (h.estado === 'revision' && !h.aprobada) out.push(`<span class="tag warn">necesita revisión</span>`)
+  if (h.dudas) out.push(`<span class="tag warn">${h.dudas} duda(s)</span>`)
+  if (h.aritmetica && h.aritmetica.verificadas) out.push(`<span class="tag ok">${h.aritmetica.verificadas} verif.</span>`)
+  if (h.aprobada) out.push(`<span class="tag ok">aprobada</span>`)
+  if (h.ejercicios?.length) out.push(`<span class="tag">${esc(h.ejercicios.join(', '))}</span>`)
+  return out.join('')
+}
+
+function render() {
+  const tools = state.herramientas || {}
+  const missing = Object.entries(tools).filter(([, v]) => !v).map(([k]) => k)
+  $('#tools').innerHTML = missing.length ? `<div class="banner">Faltan herramientas del sistema: <b>${missing.join(', ')}</b>. ${tools.soffice === false ? 'Sin LibreOffice no hay PDF ni se aceptan DOCX. ' : ''}${tools.pdftoppm === false ? 'Sin pdftoppm no se aceptan PDF. ' : ''}${tools.magick === false ? 'Sin ImageMagick no hay análisis de calidad.' : ''}</div>` : ''
+  $('#board').innerHTML = COLS.map(([k, label]) => {
+    const hs = state.hojas.filter((h) => h.estado === k)
+    return `<div class="col"><h3><span>${label}</span><span class="muted">${hs.length}</span></h3>` + (hs.map((h) => {
+      const on = sel && sel.kind === 'hoja' && sel.estado === h.estado && sel.id === h.id
+      const img = `/api/archivo?${q({ estado: h.estado, id: h.id, tipo: 'imagen' })}`
+      return `<div class="item ${on ? 'sel' : ''}" data-e="${esc(h.estado)}" data-id="${esc(h.id)}"><img loading="lazy" src="${img}" alt=""><div class="t"><div class="n" title="${esc(h.id)}">${esc(h.archivo)}</div>${h.entrega ? `<span class="tag">${esc(h.entrega)}${h.orden ? ' · h' + h.orden : ''}</span>` : ''}<div>${badges(h)}</div></div></div>`
+    }).join('') || '<div class="muted small" style="padding:6px">vacío</div>') + '</div>'
+  }).join('')
+  document.querySelectorAll('.item').forEach((el) => el.onclick = () => selectHoja(el.dataset.e, el.dataset.id))
+
+  if (!state.entregas.length) $('#entregas').innerHTML = '<span class="muted">Aún no hay entregas. Sube hojas con un nombre de entrega.</span>'
+  else $('#entregas').innerHTML = `<table><thead><tr><th>Entrega</th><th>Hojas</th><th>Ensamblado</th><th></th></tr></thead><tbody>` + state.entregas.map((e) => {
+    const c = e.conteo, ens = e.ensamblado
+    const cerradas = c.procesadas + c.revision
+    return `<tr><td><b>${esc(e.nombre)}</b></td><td class="small">por procesar ${c.por_procesar} · en proceso ${c.en_proceso} · <b>cerradas ${cerradas}</b> (revisión ${c.revision})</td>
+      <td class="small">${ens ? `${ens.hojas} hoja(s) · ${ens.formulas} fórmulas${ens.faltantes?.length ? `<br><span class="tag warn">faltan: ${esc(ens.faltantes.join(', '))}</span>` : ''}${ens.fallos?.length ? `<br><span class="tag bad">${ens.fallos.length} fallo(s) de conversión</span>` : ''}${ens.pendientes && (ens.pendientes.por_procesar + ens.pendientes.en_proceso) ? `<br><span class="tag warn">quedaban pendientes al ensamblar</span>` : ''}` : '<span class="muted">sin ensamblar</span>'}</td>
+      <td style="white-space:nowrap"><button data-ens="${esc(e.nombre)}" ${cerradas ? '' : 'disabled'}>${ens ? 'Reensamblar' : 'Ensamblar'}</button>
+      ${e.tieneDocx ? `<button data-ver="${esc(e.nombre)}">Ver</button> <a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'docx', descargar: 1 })}">DOCX</a> <a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'pdf', descargar: 1 })}">PDF</a>` : ''}</td></tr>`
+  }).join('') + '</tbody></table>'
+  document.querySelectorAll('[data-ens]').forEach((b) => b.onclick = () => ensamblar(b.dataset.ens, b))
+  document.querySelectorAll('[data-ver]').forEach((b) => b.onclick = () => selectEntrega(b.dataset.ver))
+}
+
+async function ensamblar(nombre, btn) {
+  btn.disabled = true; btn.textContent = 'Ensamblando…'
+  const r = await fetch('/api/ensamblar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entrega: nombre }) })
+  const j = await r.json()
+  if (!r.ok) alert(j.message || 'No se pudo ensamblar');
+  await refresh(); if (r.ok) selectEntrega(nombre)
+}
+
+function selectHoja(estado, id) {
+  sel = { kind: 'hoja', estado, id }; tab = estado === 'por_procesar' ? 'imagen' : (estado === 'en_proceso' ? 'imagen' : 'pdf')
+  showDetail(); render()
+}
+function selectEntrega(nombre) { sel = { kind: 'entrega', nombre }; tab = 'pdf'; showDetail(); render() }
+
+function showDetail() {
+  $('#detail').classList.add('show')
+  const v = $('#dview'), tabs = $('#dtabs'), act = $('#dactions')
+  let defs = []
+  if (sel.kind === 'hoja') {
+    const h = state.hojas.find((x) => x.estado === sel.estado && x.id === sel.id) || {}
+    $('#dtitle').textContent = `${h.archivo || sel.id} · ${sel.estado.replace('_', ' ')}`
+    const u = (tipo, d) => `/api/archivo?${q({ estado: sel.estado, id: sel.id, tipo, ...(d ? { descargar: 1 } : {}) })}`
+    defs = [['imagen', 'Foto original', 'img', u('imagen')]]
+    if (sel.estado !== 'por_procesar') defs.push(['mejorada', 'Foto mejorada', 'img', u('mejorada')], ['md', 'Transcripción', 'txt', u('md')])
+    if (sel.estado === 'procesadas' || sel.estado === 'revision') defs.push(['pdf', 'Documento (PDF)', 'pdf', u('pdf')])
+    act.innerHTML = (sel.estado === 'procesadas' || sel.estado === 'revision')
+      ? `<a class="btn primary" href="${u('docx', 1)}">Descargar DOCX</a> <a class="btn" href="${u('pdf', 1)}">Descargar PDF</a> <a class="btn" href="${u('md', 1)}">Descargar MD</a>` : ''
+    $('#dnote').textContent = h.requierenRevision && h.requierenRevision.length ? 'Pendiente: ' + h.requierenRevision.join(' · ') : (sel.estado === 'procesadas' || sel.estado === 'revision' ? 'El PDF se genera con LibreOffice a partir del DOCX: las ecuaciones se ven parecidas, no idénticas, a Word.' : '')
+  } else {
+    $('#dtitle').textContent = `Entrega · ${sel.nombre}`
+    const u = (tipo, d) => `/api/entrega?${q({ nombre: sel.nombre, tipo, ...(d ? { descargar: 1 } : {}) })}`
+    defs = [['pdf', 'Documento ensamblado (PDF)', 'pdf', u('pdf')], ['md', 'Texto ensamblado', 'txt', u('md')], ['json', 'Orden y avisos', 'json', u('json')]]
+    act.innerHTML = `<a class="btn primary" href="${u('docx', 1)}">Descargar DOCX</a> <a class="btn" href="${u('pdf', 1)}">Descargar PDF</a>`
+    $('#dnote').textContent = 'Orden: actividad → ejercicio → inciso. Lo que el alumno escribió sin marca de ejercicio se queda con lo anterior.'
+  }
+  if (!defs.find((d) => d[0] === tab)) tab = defs[0][0]
+  tabs.innerHTML = defs.map((d) => `<button data-t="${d[0]}" class="${d[0] === tab ? 'on' : ''}">${d[1]}</button>`).join('')
+  tabs.querySelectorAll('button').forEach((b) => b.onclick = () => { tab = b.dataset.t; showDetail() })
+  const d = defs.find((x) => x[0] === tab)
+  const bust = (d[3].includes('?') ? '&' : '?') + 't=' + Date.now()
+  if (d[2] === 'img') v.innerHTML = `<img src="${d[3]}${bust}" alt="">`
+  else if (d[2] === 'pdf') { v.innerHTML = `<div class="muted" style="padding:14px">Generando PDF…</div>`; const f = document.createElement('iframe'); f.src = d[3] + bust; f.onload = () => v.firstChild && v.firstChild.remove(); v.appendChild(f) }
+  else fetch(d[3] + bust).then((r) => r.ok ? r.text() : r.json().then((j) => j.message || 'No disponible')).then((t) => { v.innerHTML = `<pre>${esc(d[2] === 'json' ? JSON.stringify(JSON.parse(t), null, 2) : t)}</pre>` }).catch(() => { v.innerHTML = '<pre>No disponible todavía.</pre>' })
+  $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// Subida
+async function upload(files) {
+  if (!files.length) return
+  $('#upmsg').textContent = `Subiendo y convirtiendo ${files.length} archivo(s)…`
+  const fd = new FormData(); fd.append('entrega', $('#entrega').value.trim())
+  for (const f of files) fd.append('files', f, f.name)
+  try {
+    const r = await fetch('/api/subir', { method: 'POST', body: fd }); const j = await r.json()
+    if (!r.ok) { $('#upmsg').innerHTML = `<span class="w">${esc(j.message || 'Error al subir')}</span>`; return }
+    const n = j.resultados.reduce((a, x) => a + x.guardadas.length, 0)
+    $('#upmsg').innerHTML = `${n} imagen(es) en la cola.` + j.resultados.flatMap((x) => x.avisos).map((a) => `<div class="w">⚠ ${esc(a)}</div>`).join('')
+  } catch (e) { $('#upmsg').innerHTML = `<span class="w">No se pudo subir: ${esc(e.message)}</span>` }
+  refresh()
+}
+const drop = $('#drop'), inp = $('#file')
+drop.onclick = () => inp.click()
+inp.onchange = () => { upload([...inp.files]); inp.value = '' }
+;['dragenter','dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over') }))
+;['dragleave','drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
+drop.addEventListener('drop', (e) => upload([...e.dataTransfer.files]))
+
+$('#btnPrompt').onclick = async () => {
+  const t = await (await fetch('/api/prompt')).text()
+  try { await navigator.clipboard.writeText(t); $('#btnPrompt').textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }
+  setTimeout(() => $('#btnPrompt').textContent = 'Copiar prompt de inicio', 1800)
+}
+
+refresh(); setInterval(refresh, 4000)
+</script>
+</body>
+</html>

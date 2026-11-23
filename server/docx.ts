@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import { parseMmd, type Block, type Inline } from '../src/shared/mmd'
+import { renderFigure } from './figures'
 import { latexToOmml } from './omml'
 
 export interface DocxPage {
@@ -30,7 +31,10 @@ export interface DocxResult {
 const NS =
   'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
   'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ' +
-  'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+  'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+  'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+  'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+  'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -41,6 +45,8 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
   let formulas = 0
   const failed: FormulaIssue[] = []
   let currentPage = ''
+  const media: { name: string; data: Buffer }[] = []
+  const EMU = 9525 // por píxel lógico a 96 dpi
 
   /** Si una fórmula no se puede convertir, se conserva el LaTeX visible y resaltado: nunca se pierde. */
   const fallback = (latex: string, display: boolean) =>
@@ -59,8 +65,31 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
       .map((i) => (i.t === 'math' ? math(i.latex, false) : textRun(i.text, i.bold || bold ? '<w:b/>' : '')))
       .join('')
 
+  /** Una gráfica se incrusta como imagen en su posición exacta; si falla, queda el JSON visible y resaltado. */
+  const figure = (source: string): string => {
+    const res = renderFigure(source)
+    if (!res.ok) {
+      failed.push({ page: currentPage, latex: 'gráfica', error: res.error })
+      return `<w:p><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:highlight w:val="yellow"/></w:rPr><w:t xml:space="preserve">${esc(`[Gráfica no válida: ${res.error}]`)}</w:t></w:r></w:p>`
+    }
+    const n = media.length + 1
+    media.push({ name: `fig${n}.png`, data: res.png })
+    const cx = Math.round(Math.min(res.width, 420) * EMU)
+    const cy = Math.round((Math.min(res.width, 420) / res.width) * res.height * EMU)
+    const alt = esc(`${res.alt} ${source.replace(/\s+/g, ' ').slice(0, 1500)}`).replace(/"/g, '&quot;')
+    return (
+      `<w:p><w:pPr><w:keepNext/><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>` +
+      `<wp:docPr id="${n}" name="Gráfica ${n}" descr="${alt}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
+      `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="fig${n}.png"/><pic:cNvPicPr/></pic:nvPicPr>` +
+      `<pic:blipFill><a:blip r:embed="rIdFig${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+      `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
+    )
+  }
+
   const block = (b: Block): string => {
     switch (b.t) {
+      case 'figure':
+        return figure(b.source)
       case 'display': {
         const res = latexToOmml(b.latex, true)
         formulas++
@@ -121,7 +150,7 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
   const zip = new JSZip()
   zip.file(
     '[Content_Types].xml',
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`,
   )
   zip.file(
     '_rels/.rels',
@@ -129,7 +158,7 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
   )
   zip.file(
     'word/_rels/document.xml.rels',
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${media.map((m, i) => `<Relationship Id="rIdFig${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${m.name}"/>`).join('')}</Relationships>`,
   )
   zip.file(
     'docProps/core.xml',
@@ -137,6 +166,7 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
   )
   zip.file('word/styles.xml', styles)
   zip.file('word/document.xml', document)
+  for (const m of media) zip.file(`word/media/${m.name}`, m.data)
 
   return zip
     .generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })

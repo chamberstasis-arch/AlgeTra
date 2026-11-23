@@ -41,13 +41,16 @@ Pasos según la documentación de Mathpix ([crear una API key](https://mathpix.c
 
 ## Modo agente (harness)
 
-Alternativa a la aplicación: un **agente de IA** hace de trabajador y tú lo supervisas. Detalle y límites en [`ART-019`](docs/artefactos/19-entorno-agente-transcriptor.md).
+Alternativa a la aplicación de Mathpix: un **agente de IA** hace de trabajador y tú lo supervisas. Detalle, límites y gráficas en [`ART-019`](docs/artefactos/19-entorno-agente-transcriptor.md).
 
-1. Deja las fotos en `trabajo/por_procesar/`.
-2. Abre tu herramienta de agentes en la raíz del repo y pídele: *"Lee `harness/INSTRUCCIONES.md` y `harness/APRENDIZAJES.md` y procesa la siguiente hoja"* (la skill `transcribir-libreta` y `AGENTS.md`/`QWEN.md` apuntan al mismo manual).
-3. El agente usa `pnpm harness siguiente → validar → cerrar`. Las hojas limpias quedan en `trabajo/procesadas/`; las que tengan `[?]`, dudas o gráficas, en `trabajo/revision/`, con su `documento.docx`.
-4. Tú revisas: editas `transcripcion.md` si hace falta y ejecutas `pnpm harness aprobar <id>` (regenera el DOCX con tu versión y mide al agente). Si algo se repite, `pnpm harness aprender "regla"` para que no vuelva a ocurrir. `pnpm harness reabrir <id>` devuelve una hoja al agente.
-5. `pnpm harness medir` resume la exactitud sobre las hojas aprobadas.
+1. `pnpm ui` → abre **http://localhost:8080** (o el siguiente puerto libre). Ahí subes fotos, PDF o DOCX (todo se convierte a imágenes), ves la cola, los resultados, el PDF y descargas DOCX/PDF.
+2. Pon un nombre de **entrega** por alumno/actividad: sus hojas se ensamblan juntas, ordenadas por ejercicio e inciso.
+3. Abre tu herramienta de agentes en la raíz del repo y pega el prompt (botón **Copiar prompt de inicio**, o `harness/PROMPT_INICIO.md` / `harness/PROMPT_ENTREGA.md`). El agente usa `pnpm harness siguiente → validar → cerrar`.
+4. Las hojas limpias quedan en `trabajo/procesadas/`; las que tengan `[?]`, dudas, escala inferida o figuras sin dibujar, en `trabajo/revision/`.
+5. Tú revisas: editas `transcripcion.md` si hace falta y ejecutas `pnpm harness aprobar <id>` (regenera el DOCX con tu versión y mide al agente). Si algo se repite, `pnpm harness aprender "regla"`. `pnpm harness reabrir <id>` devuelve una hoja al agente. `pnpm harness ensamblar <entrega>` (o el botón de la interfaz) une la entrega.
+6. `pnpm harness medir` resume la exactitud sobre las hojas aprobadas.
+
+Requisitos del sistema para PDF/DOCX y calidad de imagen: LibreOffice (`soffice`), `pdftoppm` (poppler) e ImageMagick (`magick`).
 
 ## Flujo de uso
 

@@ -1,6 +1,7 @@
 import temml from 'temml'
 import 'temml/dist/Temml-Local.css'
 import { useMemo } from 'react'
+import { figureSvg, parseFigure } from '../shared/figure'
 import { parseMmd, type Inline } from '../shared/mmd'
 
 export function renderMath(latex: string, display: boolean): { html: string; error?: string } {
@@ -50,6 +51,14 @@ export function MathView({ text }: { text: string }) {
     <div className="mathview">
       {blocks.map((b, k) => {
         if (b.t === 'display') return <Formula key={k} latex={b.latex} display />
+        if (b.t === 'figure') {
+          const f = parseFigure(b.source)
+          return f.ok ? (
+            <div key={k} className="figure" dangerouslySetInnerHTML={{ __html: figureSvg(f.spec) }} />
+          ) : (
+            <p key={k} className="errorbox">Gráfica no válida: {f.error}</p>
+          )
+        }
         if (b.t === 'table')
           return (
             <table key={k}>

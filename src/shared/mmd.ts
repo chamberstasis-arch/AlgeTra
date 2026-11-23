@@ -9,6 +9,8 @@ export type Block =
   | { t: 'para'; inlines: Inline[]; heading?: number }
   | { t: 'display'; latex: string }
   | { t: 'table'; rows: Inline[][][] }
+  /** Gráfica descrita en JSON dentro de un bloque ```grafica … ``` (ver figure.ts). */
+  | { t: 'figure'; source: string }
 
 const BLOCK_RE = new RegExp(
   [
@@ -16,6 +18,7 @@ const BLOCK_RE = new RegExp(
     String.raw`\\\[([\s\S]+?)\\\]`, // 2: \[ … \]
     String.raw`\\begin\{(equation\*?|align\*?|gather\*?|eqnarray\*?)\}([\s\S]+?)\\end\{\3\}`, // 3,4
     String.raw`\\begin\{tabular\}(?:\{[^}]*\})?([\s\S]+?)\\end\{tabular\}`, // 5
+    String.raw`` + '`' + String.raw`{3}grafica[ \t]*\n([\s\S]*?)` + '`' + String.raw`{3}`, // 6: ```grafica … ```
   ].join('|'),
   'g',
 )
@@ -78,7 +81,9 @@ export function parseMmd(source: string): Block[] {
   for (const m of text.matchAll(BLOCK_RE)) {
     parseTextChunk(text.slice(last, m.index), blocks)
     last = (m.index ?? 0) + m[0].length
-    if (m[5] !== undefined) {
+    if (m[6] !== undefined) {
+      blocks.push({ t: 'figure', source: m[6].trim() })
+    } else if (m[5] !== undefined) {
       const rows = parseTabular(m[5])
       if (rows.length) blocks.push({ t: 'table', rows })
     } else if (m[3] !== undefined) {
@@ -103,7 +108,7 @@ export function extractEquations(source: string): string[] {
   for (const b of parseMmd(source)) {
     if (b.t === 'display') eqs.push(b.latex)
     else if (b.t === 'para') visitInlines(b.inlines)
-    else b.rows.forEach((r) => r.forEach(visitInlines))
+    else if (b.t === 'table') b.rows.forEach((r) => r.forEach(visitInlines))
   }
   return eqs
 }

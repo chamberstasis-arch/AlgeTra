@@ -44,3 +44,31 @@ describe('safeId', () => {
     expect(safeId('Álgebra ñandú.PNG')).toBe('Algebra_nandu')
   })
 })
+
+import { orderSegments, splitSegments } from './harness'
+
+describe('ensamblado por ejercicio e inciso', () => {
+  const pagina1 = '<!-- ejercicio: act-03/2 -->\nEj 2 texto\n<!-- inciso: b -->\nInciso b\n<!-- inciso: a -->\nInciso a'
+  const pagina2 = 'continuación sin marca\n<!-- ejercicio: act-03/10 -->\nEj 10\n<!-- ejercicio: act-03/1 -->\nEj 1'
+  const segs = [...splitSegments(pagina1, 1), ...splitSegments(pagina2, 2)]
+
+  it('ordena por ejercicio (numérico) e inciso y deja la continuación con su ejercicio', () => {
+    const t = orderSegments(segs).map((s) => s.text.trim())
+    // La continuación sin marca sigue a lo último escrito antes de ella (el inciso a de la hoja 1).
+    expect(t).toEqual(['Ej 1', 'Ej 2 texto', 'Inciso a', 'continuación sin marca', 'Inciso b', 'Ej 10'])
+  })
+  it('respeta el orden original si se pide', () => {
+    const t = orderSegments(segs, true).map((s) => s.text.trim())
+    expect(t).toEqual(['Ej 2 texto', 'Inciso b', 'Inciso a', 'continuación sin marca', 'Ej 10', 'Ej 1'])
+  })
+  it('conserva el orden interno de texto y gráficas dentro de un segmento', () => {
+    const s = splitSegments('<!-- ejercicio: a/1 -->\ntexto 1\n```grafica\n{}\n```\ntexto 2\n```grafica\n{}\n```', 1)
+    expect(s).toHaveLength(1)
+    expect(s[0].text.indexOf('texto 1')).toBeLessThan(s[0].text.indexOf('texto 2'))
+    expect((s[0].text.match(/```grafica/g) ?? []).length).toBe(2)
+  })
+  it('las dudas del agente no pasan al texto ensamblado', () => {
+    const s = splitSegments('<!-- ejercicio: a/1 -->\nhola <!-- DUDA: x --> mundo', 1)
+    expect(s[0].text).not.toMatch(/DUDA/)
+  })
+})
