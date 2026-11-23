@@ -58,6 +58,13 @@ export const listRuns = (): RunSummary[] =>
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
+/** Gasto estimado en Mathpix de todas las pruebas guardadas (cada intento real cuenta; el modo simulado no). */
+export function estimatedSpendUsd(costPerCall: number): number {
+  let calls = 0
+  for (const run of runs.values()) for (const p of run.pages) if (!p.mock) calls += p.attempts
+  return calls * costPerCall
+}
+
 export const getRun = (id: string) => runs.get(id)
 export const allRuns = () => [...runs.values()]
 

@@ -20,6 +20,25 @@ Con Docker: `docker compose up --build` (interfaz en `:5173`, API en `:3001`; le
 
 Los datos (imágenes, transcripciones, respuestas brutas) quedan en `data/`, fuera de git.
 
+## Configurar Mathpix (primera vez)
+
+Pasos según la documentación de Mathpix ([crear una API key](https://mathpix.com/docs/ocr/creating-an-api-key), [facturación](https://mathpix.com/docs/ocr/billing)); verifica los importes en su [página de precios](https://mathpix.com/pricing/api) antes de pagar, porque pueden cambiar:
+
+1. Crea una cuenta en [console.mathpix.com](https://console.mathpix.com) y verifica el correo.
+2. Crea una **organización** para la API de OCR.
+3. Configura la **facturación**. Las claves solo funcionan con facturación activa. Mathpix no ofrece prueba gratuita; la documentación indica un pago único de **US$ 19.99** que deja **US$ 29** de saldo de prueba. Después se paga por uso (≈ US$ 0.002 por imagen).
+4. En la pestaña **API keys** crea una clave: obtendrás un `app_id` y una `app_key`.
+5. Pégalos **tú** en `.env` (`MATHPIX_APP_ID=…`, `MATHPIX_APP_KEY=…`, sin comillas) y pon `MATHPIX_MOCK=0`. `.env` no se sube a git. **No pegues la clave en el chat ni en ningún archivo versionado**: no hace falta; el servidor la lee de `.env` y quien trabaje contigo solo necesita ejecutar los comandos de abajo.
+6. Comprueba: `pnpm mathpix:check` hace **una** petición real (≈ US$ 0.002) con una imagen mínima e indica si las credenciales funcionan.
+
+**Controlar el gasto.** El panel de Mathpix avisa por correo según el uso por clave, pero **solo avisa, no bloquea**; la documentación no describe un tope en dólares (se pide a support@mathpix.com). Por eso el proyecto tiene su propio tope: `MATHPIX_BUDGET_USD=5` en `.env` hace que, al alcanzar ese gasto estimado, las páginas nuevas fallen con `budget_exceeded` en lugar de cobrarse. Es una estimación sobre las pruebas guardadas en `data/` (si borras pruebas, el contador baja); la cifra real está en la pestaña *Usage* de la consola.
+
+### Entorno de pruebas con capturas
+
+1. Copia las fotos a `pruebas/capturas/` (no se versiona).
+2. Con el servidor en marcha (`pnpm dev:all`): `pnpm probar pruebas/capturas --max 3` muestra el costo estimado, pide confirmación, reduce las fotos grandes (necesita ImageMagick) y crea una prueba visible en la interfaz. Opciones: `--sin-layout` (para comparar con y sin *modo página completa*), `--nombre "Lote 1"`, `--yes`.
+3. Empieza con 3 fotos, revisa el resultado y amplía el lote.
+
 ## Flujo de uso
 
 1. **+ Nueva prueba** (opcional: desactivar *modo página completa* para comparar).

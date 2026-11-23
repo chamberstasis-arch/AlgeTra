@@ -1,6 +1,6 @@
-import { config } from './config'
+import { config, mathpixMode } from './config'
 import { OcrError, ocrImage } from './mathpix'
-import { allRuns, getRun, persist, readImage, saveRaw } from './store'
+import { allRuns, estimatedSpendUsd, getRun, persist, readImage, saveRaw } from './store'
 
 interface Job {
   runId: string
@@ -49,6 +49,14 @@ async function process({ runId, pageId }: Job) {
   await persist(run)
 
   try {
+    const { budgetUsd, costPerImageUsd } = config.mathpix
+    if (mathpixMode() === 'ready' && budgetUsd > 0 && estimatedSpendUsd(costPerImageUsd) >= budgetUsd) {
+      throw new OcrError(
+        'budget_exceeded',
+        `Se alcanzó el tope de gasto estimado (US$ ${budgetUsd}). Sube MATHPIX_BUDGET_USD en .env para continuar.`,
+        false,
+      )
+    }
     const image = await readImage(run.id, page)
     const result = await ocrImage(
       { image, mime: page.mime, filename: page.filename, settings: run.settings },

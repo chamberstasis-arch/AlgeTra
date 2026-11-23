@@ -9,3 +9,7 @@ data/
 .env
 .env.*
 !.env.example
+
+# Fotos de libretas de terceros: nunca al repositorio
+pruebas/capturas/*
+!pruebas/capturas/README.md

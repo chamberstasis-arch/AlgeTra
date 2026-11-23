@@ -22,6 +22,8 @@ export const config = {
     concurrency: Math.max(1, Math.min(10, num(process.env.MATHPIX_CONCURRENCY, 3))),
     maxAttempts: Math.max(1, num(process.env.MATHPIX_MAX_ATTEMPTS, 3)),
     costPerImageUsd: num(process.env.MATHPIX_COST_PER_IMAGE_USD, 0.002),
+    /** Tope de gasto estimado (USD) sobre las pruebas guardadas. 0 = sin tope. Protege de cargas por error. */
+    budgetUsd: Math.max(0, num(process.env.MATHPIX_BUDGET_USD, 0)),
   },
   maxUploadBytes: 12 * 1024 * 1024,
   /** Mathpix limita el cuerpo completo de la petición a 5 MB. */
