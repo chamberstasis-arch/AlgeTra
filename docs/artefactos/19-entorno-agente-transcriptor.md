@@ -193,3 +193,14 @@ Se revisó el DOCX ensamblado de la entrega real (82 páginas) y se corrigió:
 - Los agentes hacen antes de cerrar una revisión de formato de su propio texto (sin volver a la imagen); `cerrar <id> --siguiente` cierra y entrega la hoja siguiente en la misma respuesta (menos vueltas por hoja).
 
 Nota: la vista previa PDF usa LibreOffice; la fidelidad final de las ecuaciones debe confirmarse abriendo el DOCX en Word.
+
+## Revisión por contraste (`contrastar`, `figuras`)
+
+Con la entrega transcrita, `pnpm harness contrastar <entrega>` produce una lista de trabajo sin mirar fotos, para que un revisor vuelva a la imagen solo donde hace falta:
+
+- **Datos del enunciado**: el sistema o la matriz del enunciado debe aparecer como matriz aumentada igual (o casi igual: se señala la celda con signo o dígito distinto) cuando el método pide matrices; los puntos `P_n(x,y)` deben estar escritos o como columna. Se agrupa por actividad, así que lo que esté en otra hoja de la misma actividad no da falso aviso.
+- **Operaciones entre renglones**: cada `R_i → …` aplicada a la matriz anterior debe dar la siguiente; las celdas que no cuadran se listan (error del alumno o lectura equivocada).
+- **Figuras y flechas**: etiquetas con coordenadas frente a lo dibujado, flechas sin referencias ni escala, vectores de longitud cero, rótulos `x`/`y` duplicados. `pnpm harness figuras <id>` dibuja cada figura como PNG para compararla con la foto.
+- Salida final «Hojas a revisar» (en la entrega real: 21 de 62, no las 62).
+
+El enunciado solo indica dónde mirar: la corrección sale de la foto (`harness/REVISION.md`), salvo los datos copiados del enunciado cuando la foto es ambigua. El corpus no trae respuestas esperadas, así que no se puede verificar el resultado final contra una solución. Prompt «contraste» en la UI: orquestador que reparte las hojas entre subagentes `revisor` (`.opencode/agents/revisor.md`, `.qwen/agents/revisor.md`).

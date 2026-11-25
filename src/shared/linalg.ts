@@ -318,6 +318,16 @@ function parseMatrix(env: string, body: string, fence?: string): Mat | Vec | nul
   return { kind: 'mat', rows: rows as Frac[][], det: env === 'vmatrix' || fence === '|' }
 }
 
+/** Todas las matrices numéricas (no vectores ni determinantes simbólicos) que aparecen en un texto LaTeX. */
+export function extractMatrices(latex: string): Mat[] {
+  const out: Mat[] = []
+  for (const m of latex.matchAll(MATRIX_RE)) {
+    const r = parseMatrix(m[2], m[3], m[1])
+    if (r && r.kind === 'mat') out.push(r)
+  }
+  return out
+}
+
 // ---------- evaluación de una expresión ----------
 
 /** Símbolos definidos antes en la misma hoja (`v = 4i - 2j + k`). Solo letras de vectores y matrices. */

@@ -1,5 +1,5 @@
 // Herramientas locales del agente de transcripción. No llaman a ningún servicio externo.
-// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|medir|aprender> [...]
+// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|contrastar|figuras|medir|aprender> [...]
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
@@ -8,6 +8,8 @@ import { runChecks } from '../server/checks'
 import { findExercises, loadCorpus } from '../server/corpus'
 import { buildDocx } from '../server/docx'
 import { extraerFormato } from '../server/formato'
+import { contrastar, contrastarFiguras, verificarCadena } from '../server/contraste'
+import { renderFigure } from '../server/figures'
 import { isArithmeticError, lintTranscription, revisarFormato, parseMarkers, safeId } from '../server/harness'
 import { PRESETS, variarEstilo } from '../src/shared/estilo'
 import { D, ROOT, GUIA_CALIDAD, conLock, agruparSueltas, analyzeImage, aprobarHoja, docxHoja, enhanceImage, ensamblar, ensamblarSiCompleta, ensureDirs, ingest, guardarEstilo, leerEstilo, listHojas, ls, natural, normalizarOrientacion, regenerarEntrega } from '../server/workspace'
@@ -277,6 +279,81 @@ switch (cmd) {
       const r = await regenerarEntrega(entrega)
       console.log(r ? `Documentos regenerados (${r.hojas} hoja(s)); no se volvió a procesar nada.` : 'Estilo guardado. Se aplicará al ensamblar la entrega.')
     }
+    break
+  }
+
+  case 'contrastar': {
+    // pnpm harness contrastar <entrega>: lista de trabajo para la revisión contra el enunciado (sin mirar fotos).
+    // Agrupa las hojas por actividad, así una matriz o un punto que está en otra hoja de la misma actividad no da falso aviso.
+    if (!positional[0]) die('Uso: pnpm harness contrastar <entrega>', 2)
+    const hojas = (await listHojas()).filter((h) => h.entrega === positional[0] && (h.estado === 'procesadas' || h.estado === 'revision') && h.dir)
+    if (!hojas.length) die(`No hay hojas cerradas de la entrega "${positional[0]}".`)
+    const porAct = new Map<string, { ids: string[]; refs: Set<string>; texto: string }>()
+    const lista: { id: string; texto: string; refs: string[] }[] = []
+    for (const h of hojas) {
+      const texto = await readFile(join(h.dir!, 'transcripcion.md'), 'utf8')
+      const refs = parseMarkers(texto).refs
+      lista.push({ id: h.id, texto, refs })
+      for (const a of new Set(refs.map((r) => r.split('/')[0]))) {
+        const g = porAct.get(a) ?? { ids: [], refs: new Set<string>(), texto: '' }
+        g.ids.push(h.id.replace(/^.*__/, ''))
+        refs.filter((r) => r.startsWith(a + '/')).forEach((r) => g.refs.add(r))
+        g.texto += '\n' + texto
+        porAct.set(a, g)
+      }
+    }
+    let total = 0
+    const porHoja = new Map<string, Set<string>>()
+    const marca = (id: string, motivo: string) => porHoja.set(id, (porHoja.get(id) ?? new Set()).add(motivo))
+    for (const [a, g] of [...porAct].sort((x, y) => natural(x[0], y[0]))) {
+      const ex = await findExercises([...g.refs])
+      const res = contrastar(g.texto, ex).filter((r) => r.problemas.length)
+      if (!res.length) continue
+      total += res.length
+      for (const id of g.ids) marca(id, 'datos del enunciado')
+      console.log(`\n${a}  (hojas ${g.ids.join(', ')})`)
+      for (const r of res) for (const pr of r.problemas) console.log(`  ✘ ${r.ref}: ${pr}`)
+    }
+    console.log('\n── Operaciones entre renglones (cada matriz debe seguir de la anterior) ──')
+    for (const l of lista) {
+      const v = verificarCadena(l.texto)
+      if (!v.length) continue
+      total += v.length
+      marca(l.id.replace(/^.*__/, ''), 'operaciones')
+      console.log(`\n${l.id.replace(/^.*__/, '')}`)
+      for (const x of v) console.log(`  ✘ ${x}`)
+    }
+    console.log('\n── Figuras y flechas ──')
+    for (const l of lista) {
+      const hay = (l.texto.match(/```grafica/g) ?? []).length
+      if (hay) marca(l.id.replace(/^.*__/, ''), `${hay} figura(s)`)
+      const f = contrastarFiguras(l.texto)
+      if (!f.length) continue
+      total += f.length
+      console.log(`\n${l.id.replace(/^.*__/, '')}`)
+      for (const x of f) console.log(`  ! ${x}`)
+    }
+    console.log('\n── Hojas a revisar ──')
+    for (const [id, m] of [...porHoja].sort((x, y) => natural(x[0], y[0]))) console.log(`  ${id}  [${[...m].join(', ')}]`)
+    console.log(`\n${total} observación(es) en ${porHoja.size} hoja(s). Cada una dice dónde volver a mirar la foto; ninguna se corrige sola.`)
+    break
+  }
+
+  case 'figuras': {
+    // pnpm harness figuras <id>: dibuja las figuras de la hoja como PNG para compararlas con la foto.
+    const { dir } = find(positional[0], [D.en_proceso, D.procesadas, D.revision])
+    const texto = await readFile(join(dir, 'transcripcion.md'), 'utf8')
+    await mkdir(join(dir, 'figuras'), { recursive: true })
+    let n = 0
+    for (const m of texto.matchAll(/```grafica\s*\n([\s\S]*?)```/g)) {
+      n++
+      const r = renderFigure(m[1])
+      if (!r.ok) { console.log(`Figura ${n}: ${r.error}`); continue }
+      const out = join(dir, 'figuras', `figura-${String(n).padStart(2, '0')}.png`)
+      await writeFile(out, r.png)
+      console.log(`Figura ${n}: ${out}`)
+    }
+    if (!n) console.log('La hoja no tiene figuras dibujadas.')
     break
   }
 

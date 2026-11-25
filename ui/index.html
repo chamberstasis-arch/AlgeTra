@@ -99,7 +99,8 @@
   <h1>AlgeTra</h1>
   <button class="ghost" id="btnPrompt" title="Una hoja y se detiene">Prompt: una hoja</button>
   <button class="ghost" id="btnLote" title="Hasta 5 hojas seguidas y reporta una tabla">Prompt: lote</button>
-  <button class="ghost" id="btnOrq" title="Un solo agente que reparte hojas a 3 subagentes en paralelo">Prompt: orquestador</button>
+  <button class="ghost" id="btnOrq" title="Un solo agente que reparte hojas a 4 subagentes en paralelo">Prompt: orquestador</button>
+  <button class="ghost" id="btnCon" title="Revisión contra el enunciado: matrices, operaciones, figuras y flechas">Prompt: contraste</button>
 </header>
 <main>
   <div id="tools"></div>
@@ -430,7 +431,7 @@ inp.onchange = () => { upload([...inp.files]); inp.value = '' }
 ;['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
 drop.addEventListener('drop', (e) => upload([...e.dataTransfer.files]))
 
-for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador']]) {
+for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador'], ['#btnCon', 'contraste', 'Prompt: contraste']]) {
   $(id).onclick = async () => {
     const t = await (await fetch('/api/prompt' + (tipo ? '?tipo=' + tipo : ''))).text()
     try { await navigator.clipboard.writeText(t); $(id).textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }

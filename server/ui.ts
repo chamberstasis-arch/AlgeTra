@@ -24,7 +24,7 @@ const extOf = (p: string) => p.split('.').pop()!.toLowerCase()
 app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(await readFile(resolve('ui/index.html'), 'utf8')))
 
 app.get<{ Querystring: { tipo?: string } }>('/api/prompt', async (req, reply) => {
-  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : 'harness/PROMPT_INICIO.md')
+  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : req.query.tipo === 'contraste' ? 'harness/PROMPT_CONTRASTE.md' : 'harness/PROMPT_INICIO.md')
   return reply.type('text/plain; charset=utf-8').send(existsSync(p) ? await readFile(p, 'utf8') : '')
 })
 
