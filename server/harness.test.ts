@@ -184,4 +184,10 @@ describe('depuración', () => {
     const aug = '$$\\left[\\begin{array}{cc|c}1&2&3\\\\4&5&6\\end{array}\\right]$$'
     expect(depurarTexto(`${suma}\n${aug}`, { unitarios: false })).toBe(`\`\`\`aux\n${suma}\n\`\`\`\n${aug}`)
   })
+  it('depurar dos veces da lo mismo (no vuelve a envolver lo que ya está en un bloque)', () => {
+    const suma = '$$\\begin{array}{rr} & 2 \\\\ - & 4 \\\\ \\hline & 0 \\end{array}$$'
+    const una = depurarTexto(`antes\n${suma}\ndespués`, { unitarios: true })
+    expect(depurarTexto(una, { unitarios: true })).toBe(una)
+    expect((una.match(/```aux/g) ?? []).length).toBe(1)
+  })
 })

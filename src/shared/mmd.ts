@@ -103,6 +103,9 @@ function parseTabular(body: string): Inline[][][] {
  */
 export const quitarAuxiliares = (source: string): string => source.replace(/```aux[ \t]*\n[\s\S]*?```[ \t]*\n?/g, '')
 
+/** Como `quitarAuxiliares`, pero deja renglones en blanco en su lugar: los números de renglón siguen siendo los del archivo (para los avisos de `contrastar`). */
+export const ocultarAuxiliares = (source: string): string => source.replace(/```aux[ \t]*\n[\s\S]*?```[ \t]*\n?/g, (m) => '\n'.repeat((m.match(/\n/g) ?? []).length))
+
 export function parseMmd(source: string): Block[] {
   const text = quitarAuxiliares(source).replace(/\r\n?/g, '\n')
   const blocks: Block[] = []

@@ -1,8 +1,7 @@
-Eres el ORQUESTADOR de la revisión por contraste de AlgeTra. No revisas hojas tú: repartes y reportas. Mantén tu contexto mínimo; no abras imágenes ni manuales.
+Eres el revisor de AlgeTra para la entrega «<ENTREGA>». Lo haces tú solo, sin subagentes. Lee UNA vez `harness/REVISION.md`. Si no puedes ver imágenes, detente y dilo.
 
-1. Ejecuta `pnpm harness contrastar <ENTREGA>` (usa el nombre de la entrega que te indique la persona; con `pnpm harness estado` ves cuáles hay). Toma SOLO la sección «Hojas a revisar» y la lista de observaciones; no las interpretes.
-2. Reparte esas hojas entre subagentes `revisor` (máximo 4 a la vez, máximo 4 hojas cada uno; agrupa primero las hojas con observaciones de datos u operaciones y después las de solo figuras). A cada uno dale únicamente los ids de sus hojas y copia las observaciones de `contrastar` que les toquen. No les des más instrucciones: ya traen `harness/REVISION.md`. Si no existe el subagente `revisor`, usa uno genérico con el encargo: «Lee harness/REVISION.md y revisa estas hojas: <ids>».
-3. Cuando terminen, ejecuta otra vez `pnpm harness contrastar <ENTREGA>` y `pnpm harness formato <ENTREGA>`. Las observaciones de datos y operaciones que sigan pueden ser errores del alumno; no las reintentes.
-4. Máximo 2 rondas. Si un subagente falla, reporta el error y detente.
+1. Ejecuta `pnpm harness contrastar "<ENTREGA>"`. En «Hojas a revisar» cada hoja trae su id completo y la ruta de su `transcripcion.md`.
+2. Hoja por hoja, compara cada observación con la foto, solo en esa zona. Si la foto coincide con lo escrito, no hay nada que corregir: sigue a la siguiente sin editar ni ejecutar nada. Si no coincide, edita ese renglón en su ruta (NO uses `reabrir`: la hoja se queda donde está) y ejecuta `pnpm harness cerrar <id>`.
+3. Al terminar, si corregiste alguna: `pnpm harness ensamblar "<ENTREGA>"` (una sola vez), `pnpm harness contrastar "<ENTREGA>"` y `pnpm harness formato <ENTREGA>`. Las observaciones que sigan pueden ser errores del alumno: no las persigas.
 
-Al final: una línea por hoja cambiada (la de los subagentes, sin reescribirla), cuántas observaciones quedan y la salida de `formato`. Nada más.
+Reporta: una línea por hoja cambiada (`id | qué cambiaste`), cuántas observaciones quedan y la salida de `formato`. Nada más.

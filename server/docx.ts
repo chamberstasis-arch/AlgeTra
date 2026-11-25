@@ -48,7 +48,7 @@ const textRun = (text: string, rpr = '') =>
 const ESTILO_LEGADO: Estilo = { ...PRESETS.limpio, titulo: 'entrega' }
 
 /** Renglón que abre un inciso o numeral: "a)", "(b)", "1.", "2)", "iv)". */
-const INCISO_RE = /^\s*\(?(?:[a-zA-Z]\)|(?:\d{1,2}|[ivxIVX]{1,4})[).])(?:\s|$)/
+const INCISO_RE = /^\s*\(?(?:[a-zA-Z]\)|(?:\d{1,2}|[ivxIVX]{1,4})(?:[).]-?|-))(?:\s|$)/
 
 const PAPEL = { A4: { w: 11906, h: 16838 }, Carta: { w: 12240, h: 15840 } } as const
 
@@ -185,17 +185,22 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
   const f = E.fuente
   const h = (k: number) => Math.round(sz * k)
   const color = E.colorTitulos
+  // Títulos: tipografía y tamaño propios si el estilo los trae; si no, la del texto y tamaños proporcionales.
+  const fT = E.fuenteTitulos ?? f
+  const fontT = fT === f ? '' : `<w:rFonts w:ascii="${fT}" w:hAnsi="${fT}" w:eastAsia="${fT}" w:cs="${fT}"/>`
+  const szT = E.tamanoTitulos ? Math.round(E.tamanoTitulos * 2) : null
+  const sz1 = szT ?? h(1.25), sz2 = szT ? Math.max(sz, szT - 3) : h(1.17), sz3 = szT ? sz : h(1.08)
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}" w:cs="${f}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:val="es-ES"/></w:rPr></w:rPrDefault>
 <w:pPrDefault><w:pPr><w:spacing w:after="${tw(60)}" w:line="${Math.round(E.interlineado * 240)}" w:lineRule="auto"/>${E.alinear === 'justificado' ? '<w:jc w:val="both"/>' : ''}</w:pPr></w:pPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>
 <w:style w:type="paragraph" w:customStyle="1" w:styleId="TablaCelda"><w:name w:val="Tabla celda"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr><w:rPr><w:sz w:val="${Math.max(16, Math.round(sz * 0.8))}"/><w:szCs w:val="${Math.max(16, Math.round(sz * 0.8))}"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="60"/><w:jc w:val="left"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.67)}"/><w:szCs w:val="${h(1.67)}"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="60"/><w:jc w:val="left"/></w:pPr><w:rPr>${fontT}<w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.67)}"/><w:szCs w:val="${h(1.67)}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="240"/><w:jc w:val="left"/></w:pPr><w:rPr><w:color w:val="666666"/><w:sz w:val="${h(0.92)}"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="${tw(360)}" w:after="${tw(120)}"/><w:jc w:val="left"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.25)}"/><w:szCs w:val="${h(1.25)}"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:jc w:val="left"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.17)}"/><w:szCs w:val="${h(1.17)}"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:jc w:val="left"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.08)}"/><w:szCs w:val="${h(1.08)}"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="${tw(360)}" w:after="${tw(120)}"/><w:jc w:val="left"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr>${fontT}<w:b/><w:color w:val="${color}"/><w:sz w:val="${sz1}"/><w:szCs w:val="${sz1}"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:jc w:val="left"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr>${fontT}<w:b/><w:color w:val="${color}"/><w:sz w:val="${sz2}"/><w:szCs w:val="${sz2}"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:jc w:val="left"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr>${fontT}<w:b/><w:color w:val="${color}"/><w:sz w:val="${sz3}"/><w:szCs w:val="${sz3}"/></w:rPr></w:style>
 </w:styles>`
   const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`
 

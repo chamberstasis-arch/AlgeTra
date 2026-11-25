@@ -1,4 +1,4 @@
-# Revisión por contraste (manual corto del revisor)
+# Revisión por contraste (manual corto del revisor; lo sigue el agente principal, sin subagentes)
 
 Objetivo: dejar las hojas ya transcritas apegadas a lo que de verdad dice la foto, usando el enunciado de la base solo para saber DÓNDE volver a mirar. No es una segunda transcripción completa.
 
@@ -18,12 +18,21 @@ La persona revisa en la interfaz («Revisar con comentarios») renglón por reng
 ## Resultado final contra la resolución de referencia
 `contrastar` compara el resultado final de cada ejercicio con una resolución hecha con los mismos métodos del curso. No te dice el valor esperado, solo «distinto» o «no aparece»: vuelve a la foto en esa zona. Si la foto confirma lo escrito, es error del alumno y se queda.
 
-## Procedimiento por hoja (máximo 4 por encargo)
-1. `pnpm harness reabrir <id>` (la hoja pasa a en_proceso).
-2. Mira la foto en lo marcado; edita `transcripcion.md` solo donde corresponda (edición mínima, no reescribas la hoja).
+## Procedimiento por hoja
+1. Mira la foto SOLO en lo que `contrastar` marcó para esa hoja (una mirada a la zona, no a toda la hoja). **Si la foto confirma lo escrito, no hay nada que corregir: no reabras la hoja, no edites, no comentes** y pasa a la siguiente (en tu respuesta: `id | sin cambios`).
+2. Solo si hay algo que corregir: edita `transcripcion.md` donde corresponda (edición mínima, no reescribas la hoja), **en su sitio**. No uses `reabrir`: la hoja no sale de procesadas/revision, así que nunca figura como «por procesar» ni deja la entrega incompleta.
 3. Si tocaste figuras: `pnpm harness figuras <id>` y mira el PNG junto a la foto.
-4. `pnpm harness cerrar <id>` (re-valida y vuelve a ensamblar la entrega solo).
+4. `pnpm harness cerrar <id>` (re-valida y re-cierra la hoja donde está). Al terminar todas: `pnpm harness ensamblar <entrega>` una sola vez para rehacer el documento.
 5. Respuesta por hoja: `id | qué cambiaste (≤12 palabras) | pendiente`. Si no cambiaste nada, dilo: es un resultado válido.
 
+## Avisos que no son errores de la hoja (no los persigas)
+- **Resultado final «distinto» o «no aparece»**: la base puede traer otros datos que la hoja (el alumno resolvió otro sistema) o el alumno se equivocó. Mira la foto una vez; si coincide con lo transcrito, queda igual.
+- **Renglón con varias columnas pegadas con `\qquad`**: es estructura, no un error de dígitos; corrígelo solo si pega pasos de dos ejercicios distintos.
+- **Tachado, sellos y marcas del docente**: no se transcriben ni se comentan.
+- Un aviso que parece del verificador (renglón fuera de lugar, número de línea que no corresponde) NO se investiga leyendo código: anótalo en tu respuesta (`id | aviso dudoso del verificador: <qué>`) y sigue.
+
+## Ritmo
+Es solo comparar: máximo ~10 pasos por hoja y 2 miradas a la foto. Si no se resuelve, deja `[?]` o `<!-- DUDA: … -->` de una línea, ciérrala y sigue; no vuelvas a ella.
+
 ## Límites
-No leas `corpus/` entero (usa lo que imprime `contrastar`), no edites código ni manuales, no toques hojas que no te asignaron. Si un comando falla de forma rara, reporta el error y termina.
+No leas `corpus/` entero (usa lo que imprime `contrastar`), **no leas ni ejecutes código** (`scripts/`, `server/`, `src/`; no escribas scripts de prueba), no edites código ni manuales, no toques hojas de otras entregas. Si un comando falla de forma rara, reporta el error y termina.

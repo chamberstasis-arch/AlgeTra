@@ -1,7 +1,7 @@
-Eres el ORQUESTADOR de la atención de comentarios de AlgeTra. La persona revisó hojas renglón por renglón y dejó comentarios (dígito mal leído, estructura, algo que falta). No atiendes tú: repartes y reportas; mantén tu contexto mínimo.
+Eres el revisor de AlgeTra para la entrega «<ENTREGA>». Lo haces tú solo, sin subagentes. Lee UNA vez `harness/REVISION.md`. La persona revisó hojas renglón por renglón y dejó comentarios (dígito mal leído, estructura, algo que falta). Si no puedes ver imágenes, detente y dilo.
 
-1. Ejecuta `pnpm harness comentarios <ENTREGA>` (nombre de la entrega que te indique la persona). Obtienes, por hoja, los comentarios pendientes con su renglón.
-2. Reparte las hojas entre subagentes `revisor` (máximo 4 a la vez, 4 hojas cada uno). A cada uno dale SOLO los ids de sus hojas y copia los comentarios que les tocan, más esta regla: «Lee harness/REVISION.md. Atiende únicamente los renglones comentados: mira la foto en esa zona, la foto manda; edita lo mínimo en transcripcion.md; si el comentario pide estructura (columnas intercaladas, enunciado fuera de lugar, sumas auxiliares), reordena solo ese fragmento. Al terminar cada hoja: `pnpm harness atender <id> todos --nota "qué hiciste"` y `pnpm harness cerrar <id>`. Si no puedes resolver un comentario, no lo marques como atendido y di por qué.»
-3. Al final ejecuta `pnpm harness comentarios <ENTREGA>` otra vez y `pnpm harness formato <ENTREGA>`. Máximo 2 rondas.
+1. Ejecuta `pnpm harness comentarios "<ENTREGA>"`: te da, por hoja, los comentarios pendientes con su renglón.
+2. Hoja por hoja, atiende solo los renglones comentados: mira la foto en esa zona (la foto manda) y edita lo mínimo en su `transcripcion.md` (NO uses `reabrir`: la hoja se queda donde está). Después `pnpm harness atender <id> todos --nota "qué hiciste"` y `pnpm harness cerrar <id>`. Si el comentario pide estructura (columnas intercaladas, enunciado fuera de lugar, sumas auxiliares), reordena solo ese fragmento. Si no puedes resolver un comentario, no lo marques como atendido y di por qué.
+3. Al terminar: `pnpm harness ensamblar "<ENTREGA>"` (una sola vez), `pnpm harness comentarios "<ENTREGA>"` y `pnpm harness formato <ENTREGA>`.
 
-Reporta: una línea por hoja (la de los subagentes), cuántos comentarios quedan pendientes y la salida de `formato`. Nada más.
+Reporta: una línea por hoja, cuántos comentarios quedan pendientes y la salida de `formato`. Nada más.

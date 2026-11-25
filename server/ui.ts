@@ -6,10 +6,12 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { FUENTES, LIMITES, PALETAS, PRESETS, variarEstilo } from '../src/shared/estilo'
-import { D, ESTADOS, agruparSueltas, aprobarHoja, docxToPdf, ensamblar, ensureDirs, guardarEstilo, guardarTranscripcion, ingest, leerEstilo, listHojas, ls, miniatura, regenerarEntrega, toolsAvailable, type Estado, type Hoja } from './workspace'
+import { D, ESTADOS, agruparSueltas, aprobarHoja, archivarEntrega, listarArchivadas, restaurarEntrega, docxToPdf, ensamblar, ensureDirs, guardarEstilo, guardarTranscripcion, ingest, leerEstilo, listHojas, ls, miniatura, regenerarEntrega, toolsAvailable, type Estado, type Hoja } from './workspace'
 import { safeId } from './harness'
 import { extraerFormato } from './formato'
 import { guardarComentarios, leerComentarios, normalizarComentarios } from './comentarios'
+import { COMANDOS, ejecutarComando, esComando } from './comandos'
+import { ARCHIVO_PROMPT, armarPrompt, esTipoPrompt } from './prompts'
 
 const app = Fastify({ logger: { level: 'warn' }, bodyLimit: 1024 * 1024 })
 await app.register(multipart, { limits: { fileSize: 600 * 1024 * 1024, files: 200 } })
@@ -24,9 +26,20 @@ const extOf = (p: string) => p.split('.').pop()!.toLowerCase()
 
 app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(await readFile(resolve('ui/index.html'), 'utf8')))
 
-app.get<{ Querystring: { tipo?: string } }>('/api/prompt', async (req, reply) => {
-  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : req.query.tipo === 'contraste' ? 'harness/PROMPT_CONTRASTE.md' : req.query.tipo === 'comentarios' ? 'harness/PROMPT_COMENTARIOS.md' : 'harness/PROMPT_INICIO.md')
-  return reply.type('text/plain; charset=utf-8').send(existsSync(p) ? await readFile(p, 'utf8') : '')
+/** Prompt para el agente. Con `entrega` sale adaptado a ella (nombre, estado de la cola y `--entrega` en cada comando). */
+app.get<{ Querystring: { tipo?: string; entrega?: string } }>('/api/prompt', async (req, reply) => {
+  const tipo = req.query.tipo ?? ''
+  if (!esTipoPrompt(tipo)) throw bad('Tipo de prompt desconocido.')
+  const p = resolve(ARCHIVO_PROMPT[tipo])
+  const plantilla = existsSync(p) ? await readFile(p, 'utf8') : ''
+  const entrega = req.query.entrega ?? ''
+  if (!entrega) return reply.type('text/plain; charset=utf-8').send(plantilla)
+  const hojas = await listHojas()
+  const mias = hojas.filter((h) => h.entrega === entrega)
+  if (!mias.length) throw bad('No existe esa entrega en la cola.', 404)
+  const n = (e: Estado) => mias.filter((h) => h.estado === e).length
+  const otras = [...new Set(hojas.map((h) => h.entrega).filter((e) => e && e !== entrega))].sort((x, y) => x.localeCompare(y, 'es', { numeric: true }))
+  return reply.type('text/plain; charset=utf-8').send(armarPrompt(plantilla, { entrega, porProcesar: n('por_procesar'), enProceso: n('en_proceso'), cerradas: n('procesadas') + n('revision'), otras }))
 })
 
 const slim = (h: Hoja) => {
@@ -46,11 +59,12 @@ app.get('/api/estado', async () => {
       const hs = hojas.filter((h) => h.entrega === n)
       const dir = join(D.entregas, safeId(n))
       const ens = await readFile(join(dir, 'ensamblado.json'), 'utf8').then(JSON.parse).catch(() => null)
-      const estilo = (await leerEstilo(n)).nombre
-      return { nombre: n, estilo, conteo: Object.fromEntries(ESTADOS.map((e) => [e, hs.filter((h) => h.estado === e).length])), ensamblado: ens, tieneDocx: existsSync(join(dir, 'documento.docx')) }
+      const formato = await leerEstilo(n)
+      const estilo = formato.nombre
+      return { nombre: n, estilo, formato, conteo: Object.fromEntries(ESTADOS.map((e) => [e, hs.filter((h) => h.estado === e).length])), ensamblado: ens, tieneDocx: existsSync(join(dir, 'documento.docx')) }
     }),
   )
-  return { hojas: hojas.map(slim), entregas, herramientas: await toolsAvailable() }
+  return { hojas: hojas.map(slim), entregas, presets: PRESETS, archivadas: await listarArchivadas(), herramientas: await toolsAvailable() }
 })
 
 app.post('/api/subir', async (req) => {
@@ -110,9 +124,9 @@ app.get<{ Querystring: { estado: string; id: string; tipo: string; descargar?: s
   return reply.header('Cache-Control', 'no-store').type(MIME[extOf(p)] ?? 'application/octet-stream').send(await readFile(p))
 })
 
-app.get<{ Querystring: { nombre: string; tipo: string; descargar?: string } }>('/api/entrega', async (req, reply) => {
+app.get<{ Querystring: { nombre: string; tipo: string; descargar?: string; archivada?: string } }>('/api/entrega', async (req, reply) => {
   const { nombre, tipo } = req.query
-  const dir = join(D.entregas, safeId(nombre ?? ''))
+  const dir = req.query.archivada ? join(D.archivo, safeId(nombre ?? ''), 'entrega') : join(D.entregas, safeId(nombre ?? ''))
   const files: Record<string, string> = { docx: 'documento.docx', pdf: 'documento.docx', md: 'ensamblado.md', json: 'ensamblado.json' }
   if (!files[tipo]) throw bad('Tipo desconocido.')
   let p = join(dir, files[tipo])
@@ -137,6 +151,31 @@ app.post<{ Body: { entrega: string; ordenOriginal?: boolean } }>('/api/ensamblar
     return await ensamblar(req.body.entrega, { ordenOriginal: !!req.body.ordenOriginal })
   } catch (e) {
     throw bad(e instanceof Error ? e.message : 'No se pudo ensamblar.')
+  }
+})
+
+/** Lanza uno de los comandos del harness (lista cerrada) sobre una entrega y devuelve lo que imprimiría. */
+app.post<{ Body: { entrega: string; comando: string } }>('/api/comando', async (req) => {
+  const { entrega, comando } = req.body ?? ({} as any)
+  if (!esComando(comando)) throw bad('Comando no permitido.')
+  if (!(await listHojas()).some((h) => h.entrega === entrega)) throw bad('No existe esa entrega.', 404)
+  return { comando, titulo: COMANDOS[comando].titulo, ...(await ejecutarComando(comando, entrega)) }
+})
+
+/** Saca una entrega de la cola (el agente deja de verla); todo queda en trabajo/archivo/ y se puede restaurar. */
+app.post<{ Body: { entrega: string } }>('/api/archivar', async (req) => {
+  try {
+    return await archivarEntrega(String(req.body?.entrega ?? ''))
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudo archivar.')
+  }
+})
+
+app.post<{ Body: { id: string } }>('/api/restaurar', async (req) => {
+  try {
+    return await restaurarEntrega(String(req.body?.id ?? ''))
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudo restaurar.')
   }
 })
 
@@ -175,7 +214,8 @@ app.put<{ Body: { entrega: string; estilo: unknown } }>('/api/estilo', async (re
   if (!req.body?.entrega) throw bad('Falta la entrega.')
   const estilo = await guardarEstilo(req.body.entrega, req.body.estilo)
   try {
-    return { estilo, ensamblado: await regenerarEntrega(req.body.entrega) }
+    const abiertas = (await listHojas()).filter((h) => h.entrega === req.body.entrega && (h.estado === 'en_proceso' || h.estado === 'por_procesar')).length
+    return { estilo, ensamblado: await regenerarEntrega(req.body.entrega), abiertas }
   } catch (e) {
     throw bad(e instanceof Error ? e.message : 'No se pudieron regenerar los documentos.', 500)
   }

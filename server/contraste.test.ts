@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { contrastar, contrastarFiguras, sistemaAMatriz, verificarCadena } from './contraste'
 import type { Exercise } from '../src/shared/types'
+import { ocultarAuxiliares } from '../src/shared/mmd'
 
 const ej = (statement: string, ref = 'act-07/1'): Exercise => ({ ref, number: ref.split('/')[1], statement, answerText: '', answers: [] })
 const SIS = 'Resolver por Gauss-Jordan:\n$$\\begin{aligned}x + y &= 3 \\\\ 2x - y &= 0\\end{aligned}$$'
@@ -62,5 +63,29 @@ describe('estructura intercalada', () => {
   it('una progresión de 3 pasos en un renglón es normal; 4 o más bloques se señalan', () => {
     expect(estructuraIntercalada('$$2x-y=3 \\qquad -y=3-2x \\qquad y=-3+2x$$')).toEqual([])
     expect(estructuraIntercalada('$$a=1 \\qquad b=2 \\qquad c=3 \\qquad d=4$$')).toHaveLength(1)
+  })
+})
+
+describe('las cuentas aparte (bloques aux) no se verifican', () => {
+  // Fragmento real de una hoja: tras la operación R_3 → R_3+3R_2 viene la cuenta a dos pisos (aux) y luego la matriz.
+  const aux = (cuerpo: string) => '```aux\n$$' + cuerpo + '$$\n```'
+  const A0 = '$$\\left[\\begin{array}{ccc|c} 1 & 1 & -1 & 0 \\\\ 2 & -4 & 3 & 0 \\\\ -5 & 13 & -10 & 0 \\end{array}\\right]$$'
+  const A1 = '$$\\left[\\begin{array}{ccc|c} 1 & 1 & -1 & 0 \\\\ 0 & -6 & 5 & 0 \\\\ 0 & 18 & -15 & 0 \\end{array}\\right]$$'
+  const A2 = '$$\\left[\\begin{array}{ccc|c} 1 & 1 & -1 & 0 \\\\ 0 & -6 & 5 & 0 \\\\ 0 & 0 & 0 & 0 \\end{array}\\right]$$'
+  const t = [
+    A0, '$$R_2 \\to R_2-2R_1$$', aux('\\begin{array}{crrrr} & 2 & -4 & 3 & 0 \\\\ - & 2 & 2 & -2 & 0 \\\\ \\hline & 0 & -6 & 5 & 0 \\end{array}'),
+    '$$R_3 \\to R_3+5R_1$$', aux('\\begin{array}{crrrr} & -5 & 13 & -10 & 0 \\\\ + & 5 & 5 & -5 & 0 \\\\ \\hline & 0 & 18 & -15 & 0 \\end{array}'),
+    A1, '$$R_3 \\to R_3+3R_2$$', aux('\\begin{array}{rrrr} 0 & 18 & -15 & 0 \\\\ 0 & -18 & 15 & 0 \\\\ \\hline 0 & 0 & 0 & 0 \\end{array}'), A2,
+  ].join('\n')
+
+  it('con el bloque aux a la vista se marcaba una "diferencia" que no existe; oculto, la cadena cuadra', () => {
+    expect(verificarCadena(t).join(' ')).toMatch(/Línea \d+/) // el defecto
+    expect(verificarCadena(ocultarAuxiliares(t))).toEqual([])
+  })
+  it('ocultar conserva los números de renglón del archivo', () => {
+    const o = ocultarAuxiliares(t)
+    expect(o.split('\n').length).toBe(t.split('\n').length)
+    expect(o).not.toContain('hline')
+    expect(o.split('\n')[0]).toBe(t.split('\n')[0])
   })
 })

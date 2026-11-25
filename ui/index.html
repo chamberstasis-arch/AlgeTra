@@ -103,17 +103,67 @@
   .fields label.chk { display:flex; align-items:center; gap:8px; color:var(--ink); font-size:14px; margin:0; padding-top:22px; }
   details { margin-top:14px; } summary { cursor:pointer; color:var(--mut); font-size:14px; padding:4px 0; } summary:hover { color:var(--ink); }
   .foot { display:flex; align-items:center; gap:12px; margin-top:18px; }
+
+  /* Pasos */
+  .intro { display:flex; gap:10px; margin:14px 0 0; flex-wrap:wrap; }
+  .intro div { flex:1; min-width:200px; font-size:13px; color:var(--mut); padding:10px 12px; border:1px solid var(--line); border-radius:var(--r); background:var(--card); }
+  .intro b { color:var(--ink); display:block; font-size:13.5px; }
+  .step { display:flex; gap:14px; padding:14px 16px; border:1px solid var(--line); border-radius:var(--r); background:var(--card); margin-bottom:10px; }
+  .step .num { flex:none; width:26px; height:26px; border-radius:50%; background:#eeece9; color:var(--mut); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; margin-top:1px; }
+  .step.ok .num { background:var(--ok); color:#fff; }
+  .step.now { border-color:var(--acc); box-shadow:0 0 0 3px #e6eefb; }
+  .step.now .num { background:var(--acc); color:#fff; }
+  .step .body { flex:1; min-width:0; }
+  .step .st { font-weight:600; }
+  .step .sa { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .res { margin-top:16px; }
+  .res .rh { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); font-weight:600; }
+  .res .rh span { flex:1; }
+  .res .rb { padding:10px 14px 14px; max-height:60vh; overflow:auto; font:12.5px/1.55 ui-monospace,Consolas,monospace; }
+  .res h3 { font:600 13px system-ui,sans-serif; margin:14px 0 4px; color:var(--ink); }
+  .res .ol { white-space:pre-wrap; word-break:break-word; } .res .ol.e { color:var(--bad); } .res .ol.w { color:#9a6b0a; }
+  .res .hint { padding:0 14px 12px; font-size:13px; color:var(--mut); }
+
+  /* Colores por tipo de acción */
+  :root { --ia:#6d4fc2; --ia-bg:#f1ecfb; --ia-line:#d3c8f1; --loc:#0f8b8d; --loc-bg:#e4f5f5; --loc-line:#b3dede; --arc:#2f5fb3; --arc-bg:#e8effb; --arc-line:#bccdef; --dng:#c2410c; --dng-bg:#fdeee6; --dng-line:#f2c2a6; }
+  header h1::before { content:"A"; display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-right:9px; border-radius:8px; color:#fff; font-size:14px; background:linear-gradient(135deg,#6d4fc2,#2f5fb3 55%,#0f8b8d); vertical-align:1px; }
+  button.primary, .btn.primary { background:var(--arc); border-color:var(--arc); } button.primary:hover, .btn.primary:hover { background:#244d96; }
+  .tabs button.on { color:var(--arc); border-bottom-color:var(--arc); }
+  .chip-e { display:inline-block; font-size:11.5px; font-weight:600; padding:1px 9px; border-radius:20px; margin-left:8px; vertical-align:1px; }
+  .chip-e.ok { background:#e2f5ea; color:#1d7a47; } .chip-e.rev { background:#fdf1d6; color:#8a5a06; } .chip-e.now { background:#e3ecfb; color:#244d96; } .chip-e.pend { background:#eeece9; color:#57534e; }
+  .key { display:flex; flex-wrap:wrap; gap:8px 18px; padding:10px 14px; margin-bottom:12px; border:1px solid var(--line); border-radius:var(--r); background:var(--card); font-size:13px; color:var(--mut); }
+  .key span.k { display:inline-block; font-size:11.5px; font-weight:700; padding:1px 9px; border-radius:20px; margin-right:6px; }
+  .k.ia { background:var(--ia-bg); color:var(--ia); border:1px solid var(--ia-line); } .k.loc { background:var(--loc-bg); color:var(--loc); border:1px solid var(--loc-line); } .k.arc { background:var(--arc-bg); color:var(--arc); border:1px solid var(--arc-line); }
+  .step.s2 { border-left:4px solid var(--ia); } .step.s3 { border-left:4px solid var(--loc); } .step.s4 { border-left:4px solid #d97706; } .step.s5 { border-left:4px solid #db2777; } .step.s6 { border-left:4px solid #0ea5e9; } .step.s7 { border-left:4px solid var(--arc); } .step.s8 { border-left:4px solid #a8a29e; }
+  .step.s1 { border-left:4px solid var(--ok); }
+  .sa { align-items:flex-start; }
+  .act { display:flex; flex-direction:column; gap:3px; max-width:230px; }
+  .act .hint { font-size:11.5px; color:var(--mut); line-height:1.3; padding-left:2px; }
+  .act .hint::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:#a8a29e; }
+  .act.ia .hint::before { background:var(--ia); } .act.loc .hint::before { background:var(--loc); } .act.arc .hint::before { background:var(--arc); } .act.dng .hint::before { background:var(--dng); }
+  .b-ia { background:var(--ia-bg); border-color:var(--ia-line); color:#4a2f9a; font-weight:600; } .b-ia:hover { border-color:var(--ia); background:#e7def9; }
+  .b-ia.solid { background:var(--ia); border-color:var(--ia); color:#fff; } .b-ia.solid:hover { background:#5a3fa8; }
+  .b-loc { background:var(--loc-bg); border-color:var(--loc-line); color:#0b6264; font-weight:600; } .b-loc:hover { border-color:var(--loc); background:#d6f0f0; }
+  .b-arc { background:var(--arc-bg); border-color:var(--arc-line); color:#1f4a99; font-weight:600; } .b-arc:hover { border-color:var(--arc); background:#dbe6fa; }
+  .b-arc.solid { background:var(--arc); border-color:var(--arc); color:#fff; }
+  .b-dng { background:var(--dng-bg); border-color:var(--dng-line); color:#a33509; font-weight:600; } .b-dng:hover { border-color:var(--dng); }
+  .b-dng.armed { background:var(--dng); border-color:var(--dng); color:#fff; animation:pulse 1s infinite; }
+  .pres { margin-top:12px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; }
+  .pres .sum { padding:9px 12px; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .pres .sum.ok { background:#e2f5ea; color:#1d7a47; } .pres .sum.warn { background:#fdf1d6; color:#8a5a06; } .pres .sum.err { background:#fde4de; color:#a3260f; } .pres .sum.run { background:#e3ecfb; color:#244d96; } .pres .sum.ia { background:var(--ia-bg); color:#4a2f9a; }
+  .pres .sum span { flex:1; } .pres .sum button { font-size:12.5px; padding:3px 10px; }
+  .pres .rb { padding:10px 12px 12px; max-height:46vh; overflow:auto; font:12.5px/1.55 ui-monospace,Consolas,monospace; }
+  .pres pre.pr { margin:0; padding:10px 12px; max-height:34vh; overflow:auto; white-space:pre-wrap; word-break:break-word; font:12px/1.5 ui-monospace,Consolas,monospace; background:#faf8ff; }
+  .pres h3 { font:600 13px system-ui,sans-serif; margin:12px 0 4px; } .pres .ol { white-space:pre-wrap; word-break:break-word; } .pres .ol.e { color:var(--bad); } .pres .ol.w { color:#9a6b0a; }
+  .pres .hint2 { padding:0 12px 10px; font-size:12.5px; color:var(--mut); }
+  .toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,20px); opacity:0; pointer-events:none; padding:10px 18px; border-radius:10px; font-size:14px; font-weight:600; color:#fff; background:#1c1917; box-shadow:0 6px 24px rgba(0,0,0,.22); transition:all .22s; z-index:20; }
+  .toast.show { opacity:1; transform:translate(-50%,0); } .toast.ok { background:#1d7a47; } .toast.warn { background:#b7791f; } .toast.err { background:#b42318; }
   @media (max-width:640px) { .row-card { flex-wrap:wrap; } .acts { width:100%; } }
 </style>
 </head>
 <body>
 <header>
   <h1>AlgeTra</h1>
-  <button class="ghost" id="btnPrompt" title="Una hoja y se detiene">Prompt: una hoja</button>
-  <button class="ghost" id="btnLote" title="Hasta 5 hojas seguidas y reporta una tabla">Prompt: lote</button>
-  <button class="ghost" id="btnOrq" title="Un solo agente que reparte hojas a 4 subagentes en paralelo">Prompt: orquestador</button>
-  <button class="ghost" id="btnCom" title="Atiende los comentarios que dejaste al revisar hojas renglón por renglón">Prompt: comentarios</button>
-  <button class="ghost" id="btnCon" title="Revisión contra el enunciado: matrices, operaciones, figuras y flechas">Prompt: contraste</button>
 </header>
 <main>
   <div id="tools"></div>
@@ -124,7 +174,9 @@
     <input type="file" id="file" multiple hidden accept="image/*,.pdf,.docx,.doc,.odt,.rtf,.heic,.heif,.zip,application/zip">
     <div class="up-row"><input type="text" id="entrega" placeholder="Nombre de la entrega (opcional)" aria-label="Nombre de la entrega"></div>
     <div class="msg" id="upmsg"></div>
+    <div class="intro"><div><b>1 · Sube</b>Un ZIP, PDF o fotos de la libreta.</div><div><b>2 · Transcribe</b>Abre la entrega, pestaña «Pasos», y copia el prompt para opencode.</div><div><b>3 · Revisa</b>Contraste automático y comentarios renglón por renglón.</div><div><b>4 · Entrega</b>Ensambla, descarga el DOCX y archiva para sacarla de la cola.</div></div>
     <div class="list" id="entregas"></div>
+    <div id="archivadas" style="margin-top:28px"></div>
   </div>
 
   <!-- Entrega -->
@@ -158,7 +210,7 @@ let firma = ''
 // ───────── Datos ─────────
 async function refresh(force) {
   try { state = await (await fetch('/api/estado')).json() } catch { return }
-  const f = JSON.stringify([state.hojas, state.entregas, state.herramientas])
+  const f = JSON.stringify([state.hojas, state.entregas, state.archivadas, state.herramientas])
   if (f === firma && !force) return
   firma = f
   pintarHerramientas()
@@ -176,6 +228,10 @@ function pintarHerramientas() {
   $('#tools').innerHTML = falta.length ? `<div class="banner">Faltan herramientas del sistema: <b>${falta.join(', ')}</b>.${t.soffice === false ? ' Sin LibreOffice no hay vista PDF ni DOCX de entrada.' : ''}${t.pdftoppm === false ? ' Sin pdftoppm no se aceptan PDF.' : ''}</div>` : ''
 }
 
+function chipEstado(c) {
+  const [cl, t] = c.enProceso ? ['now', 'En proceso'] : c.porProcesar ? ['pend', `${c.porProcesar} por procesar`] : c.revision ? ['rev', `${c.revision} por revisar`] : ['ok', 'Lista']
+  return `<span class="chip-e ${cl}">${t}</span>`
+}
 function barra(c) {
   const p = (n) => (c.total ? (n / c.total) * 100 : 0)
   return `<div class="bar"><i class="g" style="width:${p(c.lista + c.aprobadas)}%"></i><i class="a" style="width:${p(c.revision)}%"></i><i class="b" style="width:${p(c.enProceso)}%"></i></div>`
@@ -200,19 +256,21 @@ function pintarLista() {
   for (const e of state.entregas) {
     const c = conteo(hojasDe(e.nombre))
     const cerradas = c.lista + c.aprobadas + c.revision
-    tarjetas.push(`<div class="card row-card" data-ent="${esc(e.nombre)}"><div class="t"><div class="n">${esc(e.nombre)}</div>${barra(c)}<div class="small muted">${resumen(c)}</div></div>
-      <div class="acts">${e.tieneDocx ? `<a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'docx', descargar: 1 })}" data-stop>DOCX</a>` : cerradas ? `<button data-ens="${esc(e.nombre)}">Ensamblar</button>` : ''}</div></div>`)
+    tarjetas.push(`<div class="card row-card" data-ent="${esc(e.nombre)}"><div class="t"><div class="n">${esc(e.nombre)}${chipEstado(c)}</div>${barra(c)}<div class="small muted">${resumen(c)}</div></div>
+      <div class="acts">${e.tieneDocx ? `<a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'docx', descargar: 1 })}" data-stop>DOCX</a>` : cerradas ? `<button data-ens="${esc(e.nombre)}">Ensamblar</button>` : ''}${c.porProcesar + c.enProceso === 0 && cerradas ? `<button class="b-dng" data-arc="${esc(e.nombre)}" title="Sacarla de la cola; queda guardada en trabajo/archivo">Archivar</button>` : ''}</div></div>`)
   }
-  $('#entregas').innerHTML = tarjetas.join('') || '<div class="empty">Aún no hay entregas. Sube tu primer ZIP.</div>'
+  $('#entregas').innerHTML = tarjetas.join('') || '<div class="empty">No hay entregas en la cola. Sube un ZIP' + ((state.archivadas || []).length ? ' o restaura una archivada.' : '.') + '</div>'
+  pintarArchivadas()
   document.querySelectorAll('#entregas [data-ent]').forEach((el) => el.onclick = () => abrirEntrega(el.dataset.ent))
   document.querySelectorAll('#entregas [data-stop]').forEach((el) => el.onclick = (ev) => ev.stopPropagation())
   document.querySelectorAll('#entregas [data-ens]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); ensamblar(b.dataset.ens, b) })
+  document.querySelectorAll('#entregas [data-arc]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); if (!b.classList.contains('armed')) { const t = b.textContent; b.classList.add('armed'); b.textContent = '¿Seguro? Otra vez'; setTimeout(() => { b.classList.remove('armed'); b.textContent = t }, 4000); return } archivar(b.dataset.arc, conteo(hojasDe(b.dataset.arc))) })
 }
 
 async function ensamblar(nombre, btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Ensamblando…' }
   const r = await post('/api/ensamblar', { entrega: nombre })
-  if (!r.ok) alert((await r.json()).message || 'No se pudo ensamblar')
+  if (!r.ok) aviso((await r.json()).message || 'No se pudo ensamblar', 'err'); else aviso('Documento ensamblado', 'ok')
   await refresh(true)
   if (r.ok && view.t === 'entrega') abrirEntrega(nombre, 'documento')
 }
@@ -227,7 +285,7 @@ document.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => { if (
 
 function abrirEntrega(nombre, tab) {
   const info = entregaInfo(nombre)
-  view = { t: 'entrega', nombre, tab: tab || (nombre === '' ? 'hojas' : info?.tieneDocx ? 'documento' : 'hojas') }
+  view = { t: 'entrega', nombre, tab: tab || (nombre === '' ? 'hojas' : 'pasos') }
   estiloCargado = null
   mostrar('entrega'); pintarEntrega(true)
 }
@@ -241,17 +299,184 @@ function pintarEntrega(completo) {
     (info?.tieneDocx ? `<a class="btn primary" href="/api/entrega?${q({ nombre, tipo: 'docx', descargar: 1 })}">Descargar DOCX</a><a class="btn" href="/api/entrega?${q({ nombre, tipo: 'pdf', descargar: 1 })}">PDF</a>` : '') +
     `<button id="bEns" ${cerradas ? '' : 'disabled'}>${info?.ensamblado ? 'Reensamblar' : 'Ensamblar'}</button>`
   if ($('#bEns')) $('#bEns').onclick = (ev) => ensamblar(nombre, ev.target)
-  const tabs = nombre === '' ? [['hojas', 'Hojas']] : [['documento', 'Documento'], ['hojas', 'Hojas'], ['estilo', 'Estilo'], ['avisos', 'Avisos']]
+  const tabs = nombre === '' ? [['hojas', 'Hojas']] : [['pasos', 'Pasos'], ['documento', 'Documento'], ['hojas', 'Hojas'], ['estilo', 'Formato'], ['avisos', 'Avisos']]
   $('#eTabs').innerHTML = tabs.map(([k, l]) => `<button data-t="${k}" class="${k === view.tab ? 'on' : ''}">${l}</button>`).join('')
   $('#eTabs').querySelectorAll('button').forEach((b) => b.onclick = () => { view.tab = b.dataset.t; estiloCargado = null; pintarEntrega(true) })
   const cuerpo = $('#eCuerpo')
   if (view.tab === 'hojas') pintarHojas(cuerpo, nombre, hs)
+  else if (view.tab === 'pasos') pintarPasos(cuerpo, nombre, info, c, completo)
   else if (!completo) return // las demás pestañas no se redibujan con el sondeo (se perdería lo que escribes)
   else if (view.tab === 'documento') {
     if (!info?.tieneDocx) cuerpo.innerHTML = `<div class="empty">Todavía no hay documento.<br>${cerradas ? 'Pulsa «Ensamblar».' : 'Se genera solo cuando el agente cierra la última hoja.'}</div>`
     else { cuerpo.innerHTML = `<div class="view"><div class="pad muted">Generando vista…</div></div>`; const f = document.createElement('iframe'); f.src = `/api/entrega?${q({ nombre, tipo: 'pdf' })}&t=${Date.now()}`; f.onload = () => cuerpo.querySelector('.pad')?.remove(); cuerpo.firstChild.appendChild(f) }
   } else if (view.tab === 'estilo') pintarEstilo(cuerpo, nombre)
   else if (view.tab === 'avisos') pintarAvisos(cuerpo, info)
+}
+
+
+async function archivar(nombre, c) {
+  const r = await post('/api/archivar', { entrega: nombre }); const j = await r.json()
+  if (!r.ok) { aviso(j.message || 'No se pudo archivar', 'err'); return }
+  delete ultimoRes[nombre]
+  irLista(); aviso(`«${nombre}» archivada: ${j.hojas} hoja(s) en trabajo/archivo`, 'ok')
+}
+async function restaurar(id, btn) {
+  btn.disabled = true
+  const r = await post('/api/restaurar', { id }); const j = await r.json()
+  if (!r.ok) { aviso(j.message || 'No se pudo restaurar', 'err'); btn.disabled = false; return }
+  await refresh(true); abrirEntrega(j.entrega, 'pasos')
+}
+function pintarArchivadas() {
+  const a = state.archivadas || []
+  $('#archivadas').innerHTML = a.length ? `<details><summary>Archivadas (${a.length}) · fuera de la cola, guardadas en trabajo/archivo</summary><div class="list" style="margin-top:10px">${a.map((x) => `<div class="card row-card" style="cursor:default"><div class="t"><div class="n">${esc(x.nombre)}</div><div class="small muted">${x.hojas} hoja(s) · archivada el ${esc(x.archivadaEn.slice(0, 10))}</div></div><div class="acts">${x.tieneDocx ? `<a class="btn" href="/api/entrega?${q({ nombre: x.id, tipo: 'docx', descargar: 1, archivada: 1 })}">DOCX</a>` : ''}<button data-rest="${esc(x.id)}">Restaurar</button></div></div>`).join('')}</div></details>` : ''
+  document.querySelectorAll('#archivadas [data-rest]').forEach((b) => b.onclick = () => restaurar(b.dataset.rest, b))
+}
+
+// ───────── Pasos de la entrega ─────────
+let ultimoRes = {} // { [entrega]: { [paso]: resultado } }: el resultado se queda dentro de su paso
+const guardarRes = (nombre, paso, r) => { (ultimoRes[nombre] = ultimoRes[nombre] || {})[paso] = r }
+
+function aviso(msg, tipo) {
+  let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t) }
+  t.className = 'toast show ' + (tipo || 'ok'); t.textContent = msg
+  clearTimeout(aviso.t); aviso.t = setTimeout(() => t.classList.remove('show'), 4000)
+}
+
+// Qué significa cada salida, en palabras (la salida cruda va debajo).
+function resumir(cmd, j) {
+  const s = j.salida || ''
+  if (!j.ok) return { t: 'err', m: 'El comando falló. Mira el detalle de abajo.' }
+  if (cmd === 'depurar') { const m = s.match(/(\d+) hoja\(s\) cambiar/); return m && +m[1] ? { t: 'warn', m: `${m[1]} hoja(s) tienen algo que limpiar. Pulsa «Aplicar limpieza» para hacerlo.` } : { t: 'ok', m: 'Nada que limpiar: las hojas ya están depuradas.' } }
+  if (cmd === 'depurar-aplicar') { const m = s.match(/Aplicado a (\d+)/); return m ? { t: 'ok', m: `Limpieza aplicada a ${m[1]} hoja(s); documentos regenerados. Quedó una copia «antes-de-depurar» en cada hoja.` } : { t: 'ok', m: 'No había nada que aplicar: ya estaba limpio.' } }
+  if (cmd === 'contrastar') { const m = s.match(/(\d+) observación\(es\) en (\d+) hoja/); return m && +m[1] ? { t: 'warn', m: `${m[1]} observación(es) en ${m[2]} hoja(s). Pulsa el número de una hoja para abrirla y revisarla.` } : { t: 'ok', m: 'Sin observaciones.' } }
+  if (cmd === 'formato') return /sin observaciones/i.test(s) ? { t: 'ok', m: 'Formato sin observaciones.' } : { t: 'warn', m: 'Hay observaciones de formato (abajo).' }
+  if (cmd === 'comentarios') return /Sin comentarios pendientes/.test(s) ? { t: 'ok', m: 'No hay comentarios pendientes.' } : { t: 'warn', m: (s.match(/\d+ comentario\(s\) pendiente\(s\)/) || ['Hay comentarios pendientes.'])[0] + ' Copia el prompt de comentarios para que el agente los atienda.' }
+  return { t: 'ok', m: 'Listo.' }
+}
+
+function mostrarRes(nombre, paso) {
+  const el = document.getElementById('res-' + paso), r = ultimoRes[nombre]?.[paso]
+  if (!el) return
+  if (!r) { el.hidden = true; el.innerHTML = ''; return }
+  el.hidden = false
+  if (r.kind === 'run') el.innerHTML = `<div class="sum run"><span>Ejecutando… puede tardar unos segundos.</span></div>`
+  else if (r.kind === 'msg') el.innerHTML = `<div class="sum ${r.t}"><span>${esc(r.texto)}</span></div>`
+  else if (r.kind === 'prompt') {
+    el.innerHTML = `<div class="sum ${r.copiado ? 'ia' : 'warn'}"><span>${r.copiado ? '✓ Prompt copiado al portapapeles. Pégalo en opencode (abierto en la carpeta del proyecto). Esto no ejecuta nada por sí solo.' : 'No pude copiarlo solo: selecciona el texto de abajo y cópialo.'}</span><button data-recopiar>Copiar otra vez</button></div><pre class="pr">${esc(r.texto)}</pre>`
+    el.querySelector('[data-recopiar]').onclick = async (ev) => { try { await navigator.clipboard.writeText(r.texto); aviso('Prompt copiado', 'ok') } catch { aviso('Selecciona el texto y cópialo', 'warn') } }
+  } else {
+    const hojas = new Map(); hojasDe(nombre).forEach((h) => { hojas.set(h.id, h); hojas.set(h.id.replace(/^.*__/, ''), h) })
+    const cuerpo = (r.salida || '(sin salida)').split('\n').map((l) => {
+      const t = l.trim()
+      if (t.startsWith('──')) return `<h3>${esc(t.replace(/─/g, '').trim())}</h3>`
+      const cls = t.startsWith('✘') ? 'e' : t.startsWith('!') ? 'w' : ''
+      const tok = t.match(/^\S+/)?.[0], h = tok && hojas.get(tok)
+      if (h) return `<div class="ol"><a href="#" data-h="${esc(h.estado)}|${esc(h.id)}">${esc(tok)}</a>${esc(t.slice(tok.length))}</div>`
+      return `<div class="ol ${cls}">${esc(l)}</div>`
+    }).join('')
+    const sm = resumir(r.comando, r)
+    el.innerHTML = `<div class="sum ${sm.t}"><span>${esc(sm.m)}</span><button data-copiar>Copiar salida</button></div><div class="rb">${cuerpo}</div>${/Hojas a revisar|^\s*\d{8}_\d{6}/m.test(r.salida || '') ? '<div class="hint2">Pulsa el número de una hoja para abrirla en «Revisar con comentarios».</div>' : ''}`
+    el.querySelector('[data-copiar]').onclick = async (ev) => { try { await navigator.clipboard.writeText(r.salida || ''); aviso('Salida copiada', 'ok') } catch { aviso('No se pudo copiar', 'warn') } }
+    el.querySelectorAll('[data-h]').forEach((a) => a.onclick = (ev) => { ev.preventDefault(); const [e, id] = a.dataset.h.split('|'); abrirHoja(e, id, nombre, 'pasos'); if (e === 'procesadas' || e === 'revision') { view.tab = 'revision'; pintarHoja() } })
+  }
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+}
+
+function pintarPasos(cuerpo, nombre, info, c, completo) {
+  const cerradas = c.lista + c.aprobadas + c.revision
+  const hechas = c.total > 0 && cerradas === c.total
+  const sin = cerradas ? '' : 'disabled'
+  const otras = state.entregas.map((e) => e.nombre).filter((n) => n !== nombre)
+  const pendientes = c.porProcesar + c.enProceso
+  const fm = info?.formato
+  // Cada acción dice qué es: IA (copia un prompt), Local (se ejecuta aquí) o Archivos (ensambla/descarga).
+  const ia = (tipo, txt, paso, solid, hint) => `<div class="act ia"><button class="b-ia ${solid ? 'solid' : ''}" data-prompt="${tipo}" data-et="${txt}" data-paso="${paso}">${txt}</button><span class="hint">${hint}</span></div>`
+  const loc = (cmd, txt, paso, hint, extra) => `<div class="act loc"><button class="b-loc" data-cmd="${cmd}" data-paso="${paso}" ${extra ?? sin}>${txt}</button><span class="hint">${hint}</span></div>`
+  const dng = (cmd, txt, paso, hint, extra) => `<div class="act dng"><button class="b-dng" data-cmd="${cmd}" data-paso="${paso}" data-doble ${extra ?? sin}>${txt}</button><span class="hint">${hint}</span></div>`
+  const paso = (n, est, titulo, desc, acc) => `<div class="step s${n} ${est}"><div class="num">${est === 'ok' ? '✓' : n}</div><div class="body"><div class="st">${titulo}</div><div class="small muted">${desc}</div><div class="sa">${acc}</div><div class="pres" id="res-${n}" hidden></div></div></div>`
+  const html =
+    `<div class="key"><div><span class="k ia">IA</span>copia un prompt: lo pegas tú en opencode</div><div><span class="k loc">Local</span>se ejecuta aquí, sin IA y sin costo</div><div><span class="k arc">Archivos</span>ensambla, descarga o guarda</div></div>` +
+    paso(1, 'ok', 'Hojas subidas', `${c.total} hoja(s) en esta entrega.`, '') +
+    paso(2, hechas ? 'ok' : 'now', 'Transcribir con el agente',
+      (hechas ? 'Todas las hojas están transcritas.' : `Faltan ${pendientes} hoja(s) (${c.enProceso} en proceso).`) + ` Elige un prompt, pégalo en opencode abierto en la carpeta del proyecto y déjalo trabajar; esta pantalla se actualiza sola. Ya lleva el nombre de esta entrega${otras.length ? ` y le indica que ignore ${otras.length === 1 ? 'la otra entrega' : 'las otras ' + otras.length + ' entregas'} de la cola (${otras.map(esc).join(', ')}); si ya no las necesitas, archívalas` : ''}.`,
+      ia('orquestador', 'Prompt rápido', 2, !hechas, 'Un agente reparte las hojas a 4 subagentes en paralelo') + ia('lote', 'Prompt de lote', 2, false, 'Un agente hace hasta 8 hojas seguidas') + ia('', 'Prompt de una hoja', 2, false, 'Hace una hoja y se detiene')) +
+    paso(3, '', 'Limpiar', 'Aparta las sumas a dos pisos (quedan fuera del documento) y pone i, j, k en negrita recta. Primero mira qué cambiaría; al aplicar se guarda una copia de cada hoja.',
+      loc('depurar', 'Ver qué cambiaría', 3, 'No cambia nada: solo cuenta') + dng('depurar-aplicar', 'Aplicar limpieza', 3, 'Modifica las transcripciones (con copia); pulsa dos veces')) +
+    paso(4, '', 'Revisar contra el enunciado', 'Marca datos mal leídos, operaciones que no cuadran, columnas mezcladas, resultados distintos y flechas. No corrige solo: dice dónde volver a mirar la foto.',
+      loc('contrastar', 'Contrastar', 4, 'Revisa todas las hojas al instante') + loc('formato', 'Formato del documento', 4, info?.ensamblado ? 'Revisa el documento ensamblado' : 'Ensambla primero', info?.ensamblado ? '' : 'disabled') + ia('contraste', 'Prompt de contraste', 4, false, 'Un solo agente compara las hojas marcadas con la foto')) +
+    paso(5, '', 'Comentarios', 'Abre una hoja → «Revisar con comentarios» → clic en un renglón → escribe qué está mal. Luego el agente atiende solo esos renglones.',
+      loc('comentarios', 'Ver pendientes', 5, 'Lista los comentarios sin atender') + ia('comentarios', 'Prompt de comentarios', 5, false, 'Un solo agente atiende los comentarios pendientes')) +
+    paso(6, '', 'Formato', `Solo estilos del Word: tipografías, tamaños, papel, color y si cada actividad empieza en hoja nueva. No toca lo transcrito ni procesa nada de nuevo.${fm ? ` Formato actual: <b>${esc(etiquetaPreset(fm.nombre))}</b> — ${esc(descPreset(fm))}.` : ''}${pendientes ? ` Hay ${pendientes} hoja(s) sin cerrar: el formato se guarda y el documento se rehace al cerrar la última.` : ''}`,
+      Object.entries(state.presets || {}).map(([k, pr]) => `<div class="act arc"><button class="b-arc ${fm?.nombre === k ? 'solid' : ''}" data-formato="${k}" ${sin}>${esc(etiquetaPreset(k))}</button><span class="hint">${esc(descPreset(pr))}</span></div>`).join('') +
+      `<div class="act arc"><button class="b-arc" data-ajustes>Ajustes finos…</button><span class="hint">Tipografías, tamaños, papel, gráficas</span></div>`) +
+    paso(7, info?.tieneDocx ? 'ok' : hechas ? 'now' : '', 'Entregar', info?.tieneDocx ? 'Documento listo. Si cambiaste algo, reensambla.' : 'Junta todas las hojas en un solo documento Word con ecuaciones nativas.',
+      `<div class="act arc"><button class="b-arc ${info?.tieneDocx ? '' : 'solid'}" data-ens ${sin}>${info?.ensamblado ? 'Reensamblar' : 'Ensamblar'}</button><span class="hint">Rehace el documento con las hojas actuales</span></div>` +
+      (info?.tieneDocx ? `<div class="act arc"><a class="btn b-arc solid" href="/api/entrega?${q({ nombre, tipo: 'docx', descargar: 1 })}">Descargar DOCX</a><span class="hint">Word con ecuaciones nativas</span></div><div class="act arc"><a class="btn b-arc" href="/api/entrega?${q({ nombre, tipo: 'pdf', descargar: 1 })}">PDF</a><span class="hint">Vista previa en PDF</span></div>` : '')) +
+    paso(8, '', 'Archivar', `Cuando ya la entregaste, quítala de la cola para que el agente no la mezcle con otras. No se borra nada: todo queda en <code>trabajo/archivo/${esc(nombre)}/</code> y puedes restaurarla.`,
+      dng('archivar', 'Archivar entrega', 8, 'La saca de la cola; pulsa dos veces', c.enProceso ? 'disabled title="Hay hojas en proceso"' : ''))
+  if (completo || !cuerpo.querySelector('#pasosLista')) cuerpo.innerHTML = `<div id="pasosLista"></div>`
+  const lista = $('#pasosLista')
+  lista.innerHTML = html
+  for (let n = 2; n <= 8; n++) mostrarRes(nombre, n)
+  lista.querySelectorAll('[data-prompt]').forEach((b) => b.onclick = () => copiarPrompt(b.dataset.prompt, b, nombre, Number(b.dataset.paso)))
+  lista.querySelectorAll('[data-cmd]').forEach((b) => b.onclick = () => {
+    if (b.hasAttribute('data-doble') && !b.classList.contains('armed')) { // confirmación en el propio botón (sin diálogos del navegador)
+      const txt = b.textContent; b.classList.add('armed'); b.textContent = '¿Seguro? Pulsa otra vez'
+      setTimeout(() => { b.classList.remove('armed'); b.textContent = txt }, 4000); return
+    }
+    if (b.dataset.cmd === 'archivar') return archivar(nombre, c)
+    ejecutar(b.dataset.cmd, b, nombre, Number(b.dataset.paso))
+  })
+  lista.querySelectorAll('[data-formato]').forEach((b) => b.onclick = () => aplicarFormato(nombre, b.dataset.formato, b))
+  const aj = lista.querySelector('[data-ajustes]'); if (aj) aj.onclick = () => { view.tab = 'estilo'; estiloCargado = null; pintarEntrega(true) }
+  const ens = lista.querySelector('[data-ens]'); if (ens) ens.onclick = () => ensamblar(nombre, ens)
+}
+
+async function aplicarFormato(nombre, clave, btn) {
+  const rot = btn.textContent; btn.disabled = true; btn.textContent = 'Aplicando…'
+  guardarRes(nombre, 6, { kind: 'run' }); mostrarRes(nombre, 6)
+  let j
+  try {
+    const r = await fetch('/api/estilo', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entrega: nombre, estilo: state.presets[clave] }) })
+    j = await r.json(); j.ok = r.ok
+  } catch (e) { j = { ok: false, message: 'No se pudo conectar con el servidor: ' + e.message } }
+  btn.disabled = false; btn.textContent = rot
+  const et = etiquetaPreset(clave)
+  const r6 = !j.ok ? { t: 'err', texto: j.message || 'No se pudo aplicar el formato' }
+    : j.ensamblado ? { t: 'ok', texto: `Formato «${et}» aplicado: documento rehecho con ${j.ensamblado.hojas} hoja(s). Descárgalo en el paso 7.` }
+    : j.abiertas ? { t: 'warn', texto: `Formato «${et}» guardado. Hay ${j.abiertas} hoja(s) sin cerrar, así que el documento no se rehizo (saldría incompleto): se rehace solo al cerrar la última hoja, o con «Reensamblar».` }
+    : { t: 'ok', texto: `Formato «${et}» guardado. Se usará al ensamblar la entrega (paso 7).` }
+  guardarRes(nombre, 6, { kind: 'msg', ...r6 }); mostrarRes(nombre, 6)
+  aviso(r6.texto.split('.')[0] + '.', r6.t === 'ok' ? 'ok' : r6.t === 'err' ? 'err' : 'warn')
+  refresh(true)
+}
+
+async function copiarPrompt(tipo, btn, nombre, paso) {
+  const rot = btn.textContent; btn.disabled = true; btn.textContent = 'Generando…'
+  const r = await fetch('/api/prompt?' + q({ tipo, entrega: nombre })).catch(() => null)
+  btn.disabled = false; btn.textContent = rot
+  if (!r || !r.ok) { aviso(r ? (await r.json()).message : 'No se pudo conectar con el servidor', 'err'); return }
+  const t = await r.text()
+  let copiado = true
+  try { await navigator.clipboard.writeText(t) } catch { copiado = false }
+  guardarRes(nombre, paso, { kind: 'prompt', texto: t, copiado })
+  mostrarRes(nombre, paso)
+  aviso(copiado ? 'Prompt copiado: pégalo en opencode' : 'Cópialo a mano desde el cuadro', copiado ? 'ok' : 'warn')
+}
+
+async function ejecutar(comando, btn, nombre, paso) {
+  const rot = btn.textContent; btn.disabled = true; btn.textContent = 'Ejecutando…'
+  guardarRes(nombre, paso, { kind: 'run' }); mostrarRes(nombre, paso)
+  let j
+  try {
+    const r = await post('/api/comando', { entrega: nombre, comando }); j = await r.json()
+    if (!r.ok) j = { ok: false, salida: r.status === 404 && !j.message?.includes('entrega') ? 'El servidor no conoce este comando: reinicia «pnpm ui» para cargar la versión nueva.' : (j.message || 'Error') }
+  } catch (e) { j = { ok: false, salida: 'No se pudo conectar con el servidor: ' + e.message } }
+  btn.disabled = false; btn.textContent = rot
+  guardarRes(nombre, paso, { kind: 'cmd', comando, ok: j.ok, salida: j.salida })
+  if (view.t === 'entrega' && view.nombre === nombre && view.tab === 'pasos') mostrarRes(nombre, paso)
+  const sm = resumir(comando, { ok: j.ok, salida: j.salida }); aviso(sm.m, sm.t === 'ok' ? 'ok' : sm.t === 'err' ? 'err' : 'warn')
+  if (comando === 'depurar-aplicar') refresh(true)
 }
 
 function pintarHojas(cuerpo, nombre, hs) {
@@ -263,7 +488,7 @@ function pintarHojas(cuerpo, nombre, hs) {
   if ($('#agBtn')) $('#agBtn').onclick = async () => {
     const nuevo = $('#agNombre').value.trim(); $('#agBtn').disabled = true
     const r = await post('/api/agrupar', { entrega: nuevo }); const j = await r.json()
-    if (!r.ok) { alert(j.message || 'No se pudo agrupar'); $('#agBtn').disabled = false; return }
+    if (!r.ok) { aviso(j.message || 'No se pudo agrupar', 'err'); $('#agBtn').disabled = false; return }
     await refresh(true); abrirEntrega(j.entrega, 'hojas')
   }
 }
@@ -379,11 +604,13 @@ const sel = (id, opts) => `<select id="${id}">${opts.map(([v, l]) => `<option va
 async function pintarEstilo(cuerpo, nombre) {
   CAT = CAT || await (await fetch('/api/estilos')).json()
   cuerpo.innerHTML = `<div class="card pad">
-    <p class="muted small" style="margin:0 0 12px">Cambia solo la presentación. Lo transcrito no se toca y no se vuelve a procesar nada.</p>
-    <div class="chips" id="chips">${Object.keys(CAT.presets).map((k) => `<button class="chip" data-p="${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}<button class="chip" id="e_var" title="Propone un estilo distinto cada vez">Variar</button><label class="btn chip" style="margin:0;color:var(--ink)">Desde un ejemplo…<input type="file" id="e_ej" hidden accept=".docx,.pdf"></label></div>
+    <p class="muted small" style="margin:0 0 12px">Fase de formato: solo estilos del Word (tipografías, tamaños, papel, color, hoja nueva por actividad). Lo transcrito no se toca y no se vuelve a procesar nada.</p>
+    <div class="chips" id="chips">${Object.entries(CAT.presets).map(([k, p]) => `<button class="chip" data-p="${k}" title="${esc(descPreset(p))}">${etiquetaPreset(k)}</button>`).join('')}<button class="chip" id="e_var" title="Propone un estilo distinto cada vez">Variar</button><label class="btn chip" style="margin:0;color:var(--ink)">Desde un ejemplo…<input type="file" id="e_ej" hidden accept=".docx,.pdf"></label></div>
     <div id="e_info"></div>
     <details><summary>Ajustes</summary><div class="fields">
-      ${campo('e_fuente', 'Tipografía', sel('e_fuente', CAT.fuentes.map((f) => [f, f])))}
+      ${campo('e_fuente', 'Tipografía del texto', sel('e_fuente', CAT.fuentes.map((f) => [f, f])))}
+      ${campo('e_fuenteTitulos', 'Tipografía de los títulos', sel('e_fuenteTitulos', [['', 'Igual que el texto'], ...CAT.fuentes.map((f) => [f, f])]))}
+      ${campo('e_tamanoTitulos', 'Tamaño de los títulos (pt)', '<input type="number" id="e_tamanoTitulos" step="0.5" min="12" max="20" placeholder="Automático">')}
       ${campo('e_tamano', 'Tamaño (pt)', '<input type="number" id="e_tamano" step="0.5" min="10" max="14">')}
       ${campo('e_interlineado', 'Interlineado', '<input type="number" id="e_interlineado" step="0.05" min="1" max="2">')}
       ${campo('e_margenCm', 'Márgenes (cm)', '<input type="number" id="e_margenCm" step="0.1" min="1.5" max="3.5">')}
@@ -431,13 +658,16 @@ async function pintarEstilo(cuerpo, nombre) {
     fillEstilo(j.estilo)
     await refresh(true)
     if (j.ensamblado) { view.tab = 'documento'; pintarEntrega(true) } // se ve el resultado
-    else $('#e_msg').textContent = 'Guardado. Se usará al ensamblar la entrega.'
+    else $('#e_msg').textContent = j.abiertas ? `Guardado. Hay ${j.abiertas} hoja(s) sin cerrar: el documento se rehace al cerrar la última, o con «Reensamblar».` : 'Guardado. Se usará al ensamblar la entrega.'
   }
 }
+const etiquetaPreset = (k) => (k.length <= 3 ? k.toUpperCase() : k[0].toUpperCase() + k.slice(1))
+const descPreset = (p) => `${p.fuente} ${p.tamano} pt` + (p.fuenteTitulos ? ` · títulos ${p.fuenteTitulos}${p.tamanoTitulos ? ' ' + p.tamanoTitulos + ' pt' : ''} en negritas` : '') + (p.saltoActividad ? ' · cada actividad en hoja nueva' : '') + ` · ${p.papel}`
 function marcarChip() { document.querySelectorAll('#chips [data-p]').forEach((b) => b.classList.toggle('on', estiloActual && estiloActual.nombre === b.dataset.p)) }
 function fillEstilo(e) {
   estiloActual = e
   F.forEach((k) => { $('#e_' + k).value = e[k] })
+  $('#e_fuenteTitulos').value = e.fuenteTitulos ?? ''; $('#e_tamanoTitulos').value = e.tamanoTitulos ?? ''
   $('#e_colorTitulos').value = '#' + e.colorTitulos.toLowerCase()
   $('#e_numeracion').checked = !!e.numeracion; $('#e_saltoActividad').checked = !!e.saltoActividad
   G.forEach((k) => { $('#g_' + k).value = e.grafica[k] })
@@ -447,6 +677,8 @@ function collectEstilo() {
   const e = { nombre: estiloActual?.nombre || 'personalizado', grafica: {} }
   if (estiloActual?.semilla) e.semilla = estiloActual.semilla
   F.forEach((k) => { e[k] = $('#e_' + k).value })
+  if ($('#e_fuenteTitulos').value) e.fuenteTitulos = $('#e_fuenteTitulos').value
+  if ($('#e_tamanoTitulos').value) e.tamanoTitulos = Number($('#e_tamanoTitulos').value)
   e.colorTitulos = $('#e_colorTitulos').value.replace('#', '')
   e.numeracion = $('#e_numeracion').checked; e.saltoActividad = $('#e_saltoActividad').checked
   G.forEach((k) => { e.grafica[k] = $('#g_' + k).value })
@@ -479,14 +711,6 @@ inp.onchange = () => { upload([...inp.files]); inp.value = '' }
 ;['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over') }))
 ;['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
 drop.addEventListener('drop', (e) => upload([...e.dataTransfer.files]))
-
-for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador'], ['#btnCon', 'contraste', 'Prompt: contraste'], ['#btnCom', 'comentarios', 'Prompt: comentarios']]) {
-  $(id).onclick = async () => {
-    const t = await (await fetch('/api/prompt' + (tipo ? '?tipo=' + tipo : ''))).text()
-    try { await navigator.clipboard.writeText(t); $(id).textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }
-    setTimeout(() => $(id).textContent = etiqueta, 1800)
-  }
-}
 
 refresh(true); setInterval(() => refresh(false), 4000)
 </script>

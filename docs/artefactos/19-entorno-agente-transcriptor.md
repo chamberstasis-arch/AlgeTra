@@ -17,7 +17,6 @@ El agente aporta la **visión**; el entorno aporta lo que un modelo hace mal: co
 harness/INSTRUCCIONES.md     manual del trabajador (fidelidad, formato, organización, gráficas, procedimiento, límites)
 harness/APRENDIZAJES.md      correcciones confirmadas por la persona; el agente las lee al empezar
 harness/PROMPT_INICIO.md     prompt para arrancar al agente hoja a hoja (el botón de la interfaz lo copia)
-harness/PROMPT_ENTREGA.md    prompt para procesar una entrega completa y ensamblarla
 .claude/skills/transcribir-libreta/SKILL.md   skill (formato Claude Code) que apunta al manual
 AGENTS.md, QWEN.md           contexto para otras herramientas de agente
 scripts/harness.ts           herramientas del agente: pnpm harness <comando>
@@ -31,6 +30,7 @@ trabajo/en_proceso/<id>/     la hoja actual (una a la vez)
 trabajo/procesadas/<id>/     imagen, transcripcion.md, transcripcion.original.md, documento.docx, informe.json
 trabajo/revision/<id>/       igual, pero con [?], dudas, escala inferida o figuras sin dibujar
 trabajo/entregas/<entrega>/  documento.docx ensamblado, ensamblado.md, ensamblado.json
+trabajo/archivo/<entrega>/   entregas ya terminadas, fuera de la cola (hojas por estado + entrega/); se restauran
 ```
 
 ## 3. Herramientas del agente (`pnpm harness …`)
@@ -42,7 +42,7 @@ trabajo/entregas/<entrega>/  documento.docx ensamblado, ensamblado.md, ensamblad
 | `validar <id>` | agente | Comprueba `$` sin cerrar, convertibilidad a ecuaciones de Word y **recalcula la aritmética** (señala la celda exacta). Si hay `<!-- ejercicio: act-01/1 -->`, compara con la respuesta esperada. |
 | `cerrar <id>` | agente | Se niega si hay errores. Con `[?]`, dudas o gráficas envía la hoja a `revision/`. Genera DOCX e informe. `--revisado` atestigua que reexaminó la imagen y el error aritmético es del alumno. |
 | `ensamblar <entrega>` | ambos | Une las hojas cerradas de una entrega en un documento ordenado por actividad → ejercicio → inciso. Avisa de ejercicios de la base que faltan. |
-| `reabrir <id>` | persona | Devuelve una hoja a `en_proceso/` para rehacerla con tu retroalimentación. |
+| `reabrir <id>` | persona | Devuelve una hoja a `en_proceso/` para rehacerla desde cero con tu retroalimentación. La revisión **no** la usa: corrige en su sitio y re-cierra con `cerrar <id>` (la hoja no cuenta como «por procesar»; el documento de la entrega se rehace una vez con `ensamblar`). |
 | `aprobar <id>` | persona | Tras editar `transcripcion.md` a mano, fija tu versión como referencia, regenera el DOCX y calcula la exactitud del agente. |
 | `medir` | persona | Resume exactitud sobre las hojas aprobadas (`trabajo/metricas.md`). |
 | `aprender "…"` | persona o agente | Añade una regla a `APRENDIZAJES.md`. |
@@ -90,7 +90,7 @@ Los comentarios `<!-- … -->` son el canal del agente hacia la persona (dudas, 
 
 1. Instala y configura tu herramienta de agentes según la guía del plan (ver [ART-018 §5](./18-alternativas-ocr-precision.md)). En Qwen Code el modelo y la clave se declaran en `~/.qwen/settings.json` o con variables de entorno; **para imágenes, la documentación habla de un modelo de visión "puente" (`/model --vision`); no verifiqué que `@ruta` lea imágenes directamente.** Eso es lo primero que hay que comprobar.
 2. Abre la herramienta en la raíz del repositorio (así carga `QWEN.md`/`AGENTS.md`).
-3. Pega `harness/PROMPT_INICIO.md` (o `PROMPT_ENTREGA.md` para una entrega completa; el botón de la interfaz copia el primero). El prompt obliga a leer el manual y los aprendizajes, y a una **prueba de visión**: abrir la primera imagen y describirla; si no puede verla, debe detenerse en lugar de transcribir a ciegas.
+3. Pega `harness/PROMPT_INICIO.md` (la interfaz copia el prompt ya adaptado a la entrega: nombre, estado de la cola y `--entrega` en cada comando). El prompt obliga a leer el manual y los aprendizajes, y a una **prueba de visión**: abrir la primera imagen y describirla; si no puede verla, debe detenerse en lugar de transcribir a ciegas.
 
 ## 5. Lo que se verificó y lo que no
 
@@ -203,7 +203,7 @@ Con la entrega transcrita, `pnpm harness contrastar <entrega>` produce una lista
 - **Figuras y flechas**: etiquetas con coordenadas frente a lo dibujado, flechas sin referencias ni escala, vectores de longitud cero, rótulos `x`/`y` duplicados. `pnpm harness figuras <id>` dibuja cada figura como PNG para compararla con la foto.
 - Salida final «Hojas a revisar» (en la entrega real: 21 de 62, no las 62).
 
-El enunciado solo indica dónde mirar: la corrección sale de la foto (`harness/REVISION.md`), salvo los datos copiados del enunciado cuando la foto es ambigua. El corpus no trae respuestas esperadas, así que no se puede verificar el resultado final contra una solución. Prompt «contraste» en la UI: orquestador que reparte las hojas entre subagentes `revisor` (`.opencode/agents/revisor.md`, `.qwen/agents/revisor.md`).
+El enunciado solo indica dónde mirar: la corrección sale de la foto (`harness/REVISION.md`), salvo los datos copiados del enunciado cuando la foto es ambigua. El corpus no trae respuestas esperadas, así que no se puede verificar el resultado final contra una solución. Prompt «contraste» en la UI: **un solo agente** compara las hojas marcadas con la foto, sin orquestador ni subagentes (comparar no lo necesita; la transcripción sí reparte hojas entre subagentes).
 
 ## Resolución de referencia, depuración y revisión con comentarios
 
@@ -214,3 +214,18 @@ El enunciado solo indica dónde mirar: la corrección sale de la foto (`harness/
 - **Revisión con comentarios**: pestaña «Revisar con comentarios» (foto + renglones numerados; clic en un renglón para comentarlo) → `comentarios.json` por hoja. `pnpm harness comentarios <entrega|id>` lista los pendientes; `pnpm harness atender <id> <n|todos>` los marca. Prompt: «Prompt: comentarios» (`harness/PROMPT_COMENTARIOS.md`).
 - **Tablas**: en el DOCX se compactan (ancho según contenido, letra al 80 %, sin espaciado).
 - **Figuras**: la punta de los ejes ahora sigue la dirección de la línea (el eje y apunta hacia arriba). Las figuras 3D se dibujan siempre (`RAPIDO.md`).
+
+## Todo desde la interfaz (pestaña «Pasos»)
+Cada entrega abre en «Pasos», una guía de 6 pasos con botones: 1 subida, 2 transcribir (copia el prompt rápido, de lote o de una hoja para opencode), 3 limpiar (`depurar`: vista previa o aplicar), 4 revisar (`contrastar`, `formato`, prompt de contraste), 5 comentarios (`comentarios`, prompt de comentarios) y 6 entregar (ensamblar, DOCX, PDF).
+- Los comandos corren con `POST /api/comando` (`server/comandos.ts`): lista cerrada (`contrastar`, `depurar`, `depurar-aplicar`, `formato`, `comentarios`), sin argumentos libres, y la entrega debe existir. La salida se muestra en la página; cada número de hoja es un enlace que abre «Revisar con comentarios».
+- `depurar` es idempotente: aplicarlo dos veces no vuelve a envolver las sumas que ya están en un bloque `aux`.
+- La CLI (`pnpm harness …`) sigue igual; la interfaz solo la lanza.
+
+## Una entrega a la vez: prompts por entrega y archivo
+- **Los prompts salen adaptados.** `GET /api/prompt?tipo=…&entrega=X` (`server/prompts.ts`) antepone el estado real de la cola (por procesar, en proceso, cerradas), avisa de las otras entregas que hay en la cola («no las toques») y sustituye `<ENTREGA>` en las plantillas `harness/PROMPT_*.md`, de modo que cada comando lleva `--entrega "X"`.
+- **El agente no elige entre entregas.** `pnpm harness siguiente --entrega X` solo toma hojas de X; `cerrar <id> --siguiente` sigue en la entrega de la hoja que acaba de cerrar; sin `--entrega` y con hojas de varias entregas en la cola, `siguiente` se niega (código 4) y lista cuáles hay. `estado --entrega X` muestra solo esa.
+- **Archivar** (`pnpm harness archivar <entrega>`, botón «Archivar» en Pasos y en la lista): saca la entrega de la cola y mueve todo lo suyo a `trabajo/archivo/<entrega>/` (hojas en `por_procesar/`, `procesadas/`, `revision/`, el documento y el estilo en `entrega/`). No borra nada; se niega si hay hojas en proceso o si ya hay una archivada con ese nombre. **Restaurar** (`restaurar <entrega>`, botón en «Archivadas») lo devuelve todo a su sitio y no pisa una entrega activa con el mismo nombre. `archivadas` las lista; el DOCX de una archivada se descarga desde la lista.
+- **Tipos de botón (pestaña «Pasos»).** Morado = IA: solo copia un prompt (y lo muestra debajo del botón); no ejecuta nada. Verde azulado = Local: corre el comando del harness aquí, sin IA. Azul = Archivos: ensambla o descarga. Rojo = cambia datos (Aplicar limpieza, Archivar): se confirma pulsando dos veces. El resultado aparece dentro del paso, con una frase que lo explica y la salida cruda debajo.
+- **Formato «UV» (preset `uv`).** Pedido por un cliente: títulos de actividad en Gill Sans MT 15 en negritas, texto en Times New Roman 12, sin colores (títulos negros, gráficas en escala de grises), papel Carta y cada actividad en hoja nueva. Para ello el estilo admite `fuenteTitulos` y `tamanoTitulos` (opcionales: sin ellos los títulos siguen al texto y nada cambia en los demás presets). Es un preset más en la pestaña «Estilo»; se aplica por entrega, no a todas. Gill Sans MT debe estar instalada en el equipo que abre el Word (viene con Office).
+- **Fase de Formato.** En «Pasos» el formato es un paso aparte (6, entre Comentarios y Entregar; la pestaña «Estilo» pasó a llamarse «Formato»): solo estilos del DOCX, no toca lo transcrito ni procesa nada. Muestra el formato actual y aplica un preset con un clic; «Ajustes finos…» abre la pestaña con todos los campos.
+- **Sin documento parcial.** Si la entrega tiene hojas abiertas (`en_proceso` o `por_procesar`), cambiar el formato, aprobar o editar una hoja rehace el DOCX de cada hoja cerrada pero **no** el documento ensamblado (saldría sin las abiertas y reemplazaría al completo). Ese se rehace solo al cerrar la última hoja, o con «Reensamblar».

@@ -321,11 +321,16 @@ export function normalizarUnitarios(text: string): string {
 
 /** Sumas y restas "a dos pisos" (array con \hline): se pasan a un bloque ```aux, fuera del documento. */
 export function envolverAuxiliares(text: string): string {
+  let dentro = false // dentro de un bloque con cercas (```aux, ```grafica…): no se vuelve a envolver
   return text
     .split('\n')
     .map((l) => {
       const t = l.trim()
-      return t.startsWith('$$') && t.endsWith('$$') && /\\begin\{array\}/.test(t) && /\\hline/.test(t) ? `\`\`\`aux\n${t}\n\`\`\`` : l
+      if (t.startsWith('```')) {
+        dentro = !dentro
+        return l
+      }
+      return !dentro && t.startsWith('$$') && t.endsWith('$$') && /\\begin\{array\}/.test(t) && /\\hline/.test(t) ? `\`\`\`aux\n${t}\n\`\`\`` : l
     })
     .join('\n')
 }

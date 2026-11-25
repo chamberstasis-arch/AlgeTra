@@ -72,6 +72,22 @@ describe('DOCX con estilo', () => {
     expect(p.rels).toContain('rIdFig1')
   })
 
+  describe('formato UV (títulos Gill Sans MT 15 negritas, texto Times New Roman 12)', () => {
+    const dos = '# Actividad 1\n\nTexto $$a=1$$\n\n# Actividad 2\n\n$$b=2$$'
+    const mk = async (estilo?: Estilo) => partes((await buildDocx({ title: 'T', pages: [{ title: 'p', text: dos }], pageHeaders: false, estilo })).buffer)
+    it('los títulos llevan su tipografía y tamaño; el texto, la suya', async () => {
+      const { styles, doc } = await mk(normalizarEstilo(PRESETS.uv))
+      expect(styles).toMatch(/<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman"[^>]*\/><w:sz w:val="24"\/>/)
+      expect(styles).toMatch(/w:styleId="Heading1">.*?<w:rFonts w:ascii="Gill Sans MT"[^>]*\/><w:b\/><w:color w:val="000000"\/><w:sz w:val="30"\/>/)
+      expect(doc.match(/<w:pageBreakBefore\/>/g)).toHaveLength(1) // la actividad 2 va en hoja nueva; la 1 no
+    })
+    it('sin tipografía de títulos, nada cambia respecto al estilo de siempre', async () => {
+      const { styles } = await mk(normalizarEstilo(PRESETS.limpio))
+      expect(styles).not.toContain('Gill Sans MT')
+      expect(styles).toMatch(/w:styleId="Heading1">.*?<w:b\/>/)
+    })
+  })
+
   describe('separación entre renglones e incisos', () => {
     const texto = '# Actividad 3\n\na) $x$\n$$x=1$$\n$$x=2$$\n\nb) $y$\n$$y=1$$\n\nTexto suelto'
     const doc = async (e: Estilo) => (await partes((await buildDocx({ title: 'T', pages: [{ title: 'p', text: texto }], pageHeaders: false, estilo: e })).buffer)).doc

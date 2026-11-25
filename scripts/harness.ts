@@ -1,9 +1,10 @@
 // Herramientas locales del agente de transcripción. No llaman a ningún servicio externo.
-// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|contrastar|figuras|resolver|depurar|comentarios|atender|medir|aprender> [...]
+// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|contrastar|figuras|resolver|depurar|comentarios|atender|archivar|restaurar|archivadas|medir|aprender> [...]
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { comparePage } from '../src/shared/metrics'
+import { ocultarAuxiliares } from '../src/shared/mmd'
 import { runChecks, summarize } from '../server/checks'
 import { findExercises, loadCorpus } from '../server/corpus'
 import { buildDocx } from '../server/docx'
@@ -16,7 +17,7 @@ import { checkExpectedAnswer } from '../src/shared/linalg'
 import { corpusDir } from '../server/corpus'
 import { ACT_VECTORES, depurarTexto, isArithmeticError, lintTranscription, revisarFormato, parseMarkers, safeId } from '../server/harness'
 import { PRESETS, variarEstilo } from '../src/shared/estilo'
-import { D, ROOT, GUIA_CALIDAD, conLock, agruparSueltas, analyzeImage, aprobarHoja, docxHoja, enhanceImage, ensamblar, ensamblarSiCompleta, ensureDirs, ingest, guardarEstilo, leerEstilo, listHojas, ls, natural, normalizarOrientacion, regenerarEntrega } from '../server/workspace'
+import { D, ROOT, archivarEntrega, listarArchivadas, restaurarEntrega, GUIA_CALIDAD, conLock, agruparSueltas, analyzeImage, aprobarHoja, docxHoja, enhanceImage, ensamblar, ensamblarSiCompleta, ensureDirs, ingest, guardarEstilo, leerEstilo, listHojas, ls, natural, normalizarOrientacion, regenerarEntrega } from '../server/workspace'
 
 const LEARN = resolve('harness/APRENDIZAJES.md')
 const [cmd, ...rest] = process.argv.slice(2)
@@ -59,14 +60,20 @@ function printLint(l: Awaited<ReturnType<typeof validate>>['lint'], doubts: stri
   console.log('\n' + l.info.map((i) => `  · ${i}`).join('\n'))
 }
 
+class EntregaAmbigua extends Error {}
+
 /** Toma la siguiente hoja (exclusiva para este agente) y muestra lo que necesita para transcribirla. */
-async function tomarSiguiente(desdeCerrar = false): Promise<void> {
+async function tomarSiguiente(desdeCerrar = false, entregaFiltro = ''): Promise<void> {
   // Varios agentes pueden pedir hoja a la vez: elegir y mover la hoja ocurre bajo un candado, así que nunca
   // dos agentes reciben la misma. El trabajo pesado (calidad, copia mejorada) va fuera del candado.
   const tomada = await conLock(async () => {
     let hojas = await listHojas()
-    let pend = hojas.filter((h) => h.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
+    let pend = hojas.filter((h) => h.estado === 'por_procesar' && (!entregaFiltro || h.entrega === entregaFiltro)).sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
     if (!pend.length) return null
+    // Sin entrega indicada y con hojas de varias en la cola: no se elige por el agente (se mezclarían entregas).
+    const entregasEnCola = [...new Set(pend.map((h) => h.entrega).filter(Boolean))]
+    if (!entregaFiltro && entregasEnCola.length > 1)
+      throw new EntregaAmbigua(`Hay hojas de ${entregasEnCola.length} entregas en la cola (${entregasEnCola.join(', ')}). Indica cuál: pnpm harness siguiente --entrega "<nombre>"`)
     let aviso = ''
     if (!pend[0].entrega) {
       // Fotos sueltas: sin entrega no habría documento final. Se agrupan solas en una entrega con la fecha de hoy.
@@ -75,7 +82,7 @@ async function tomarSiguiente(desdeCerrar = false): Promise<void> {
       const g = await agruparSueltas(nombre)
       aviso = `Las hojas no tenían entrega: se agruparon (${g.movidas}) en la entrega "${g.entrega}" para obtener un solo documento al final.`
       hojas = await listHojas()
-      pend = hojas.filter((x) => x.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
+      pend = hojas.filter((x) => x.estado === 'por_procesar' && (!entregaFiltro || x.entrega === entregaFiltro)).sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
     }
     const h = pend[0]
     const stem = safeId(h.archivo)
@@ -89,10 +96,11 @@ async function tomarSiguiente(desdeCerrar = false): Promise<void> {
     // La marca de la hoja se escribe ya, dentro del candado: así la siguiente petición cuenta bien el orden.
     await writeFile(join(dir, 'meta.json'), JSON.stringify({ id, entrega: h.entrega, archivoOriginal: h.archivo, orden, tomadaEn: new Date().toISOString() }, null, 2))
     return { id, dir, img, orden, entrega: h.entrega, archivo: h.archivo, quedan: pend.length - 1, enOtras: hojas.filter((x) => x.estado === 'en_proceso').length, aviso }
-  })
+  }).catch((e) => (e instanceof EntregaAmbigua ? die(e.message, 4) : Promise.reject(e)))
   if (!tomada) {
-    if (desdeCerrar) return console.log('No quedan hojas por procesar.')
-    die('No hay imágenes en por_procesar. Trabajo terminado.', 3)
+    const de = entregaFiltro ? ` de la entrega "${entregaFiltro}"` : ''
+    if (desdeCerrar) return console.log(`No quedan hojas por procesar${de}.`)
+    die(`No hay imágenes en por_procesar${de}. Trabajo terminado.`, 3)
   }
   const { id, dir, img, orden, entrega, quedan, enOtras, aviso } = tomada!
   if (aviso) console.log(aviso)
@@ -116,18 +124,48 @@ async function tomarSiguiente(desdeCerrar = false): Promise<void> {
 
 switch (cmd) {
   case 'estado': {
-    const hojas = await listHojas()
+    // pnpm harness estado [--entrega nombre]: sin nombre muestra toda la cola; con nombre, solo esa entrega.
+    const filtro = opt('entrega')
+    const hojas = (await listHojas()).filter((h) => !filtro || h.entrega === filtro)
+    if (filtro && !hojas.length) die(`No hay hojas de la entrega "${filtro}" en la cola (¿está archivada? pnpm harness archivadas).`)
     for (const e of ['por_procesar', 'en_proceso', 'procesadas', 'revision'] as const) {
       const hs = hojas.filter((h) => h.estado === e)
       console.log(`${e.padEnd(13)} ${String(hs.length).padStart(3)}  ${hs.slice(0, 8).map((h) => h.id).join(', ')}${hs.length > 8 ? ' …' : ''}`)
     }
     const ent = [...new Set(hojas.map((h) => h.entrega).filter(Boolean))]
-    if (ent.length) console.log(`\nEntregas: ${ent.join(', ')}`)
+    if (ent.length) console.log(`\n${filtro ? 'Entrega' : 'Entregas'}: ${ent.join(', ')}`)
+    const arch = await listarArchivadas()
+    if (!filtro && arch.length) console.log(`Archivadas (fuera de la cola): ${arch.length}`)
     break
   }
 
   case 'siguiente': {
-    await tomarSiguiente()
+    // pnpm harness siguiente [--entrega nombre]: con varias entregas en la cola, el nombre es obligatorio.
+    await tomarSiguiente(false, opt('entrega') ?? '')
+    break
+  }
+
+  case 'archivar': {
+    // pnpm harness archivar <entrega>: la saca de la cola; todo queda en trabajo/archivo/<entrega>/ (se puede restaurar).
+    if (!positional[0]) die('Uso: pnpm harness archivar <entrega>', 2)
+    const r = await archivarEntrega(positional[0]).catch((e) => die(e.message))
+    console.log(`Archivada "${positional[0]}": ${r.hojas} hoja(s) y su documento en ${r.dir}\nYa no aparece en la cola. Para volver: pnpm harness restaurar ${positional[0]}`)
+    break
+  }
+
+  case 'restaurar': {
+    if (!positional[0]) die('Uso: pnpm harness restaurar <entrega>   (ver nombres con: pnpm harness archivadas)', 2)
+    const arch = await listarArchivadas()
+    const a = arch.find((x) => x.id === positional[0] || x.nombre === positional[0])
+    if (!a) die(`No hay una entrega archivada llamada "${positional[0]}".`)
+    const r = await restaurarEntrega(a!.id).catch((e) => die(e.message))
+    console.log(`Restaurada "${r.entrega}": ${r.hojas} hoja(s) de vuelta en la cola.`)
+    break
+  }
+
+  case 'archivadas': {
+    const arch = await listarArchivadas()
+    console.log(arch.length ? arch.map((a) => `  ${a.nombre}  (${a.hojas} hoja(s), archivada ${a.archivadaEn.slice(0, 10)}${a.tieneDocx ? ', con documento' : ''})`).join('\n') : 'No hay entregas archivadas.')
     break
   }
 
@@ -180,7 +218,10 @@ switch (cmd) {
   }
 
   case 'cerrar': {
-    const { dir } = find(positional[0], [D.en_proceso])
+    // Cierra una hoja en proceso, o RE-CIERRA en su sitio una hoja ya cerrada que se corrigió (revisión: sin `reabrir`, la hoja
+    // nunca sale de procesadas/revision, así que no cuenta como «por procesar» ni deja la entrega incompleta).
+    const { dir, parent } = find(positional[0], [D.en_proceso, D.procesadas, D.revision])
+    const enSitio = parent !== D.en_proceso
     const id = positional[0]
     const v = await validate(dir)
     const blocking = v.lint.errors.filter((e) => !(isArithmeticError(e) && flags.has('--revisado')))
@@ -197,7 +238,8 @@ switch (cmd) {
     const toReview = flags.has('--revision') || v.lint.needsReview.length > 0
     const target = join(toReview ? D.revision : D.procesadas, id)
     const meta = await readFile(join(dir, 'meta.json'), 'utf8').then(JSON.parse).catch(() => ({}))
-    await writeFile(join(dir, 'transcripcion.original.md'), await readFile(join(dir, 'transcripcion.md'), 'utf8'))
+    // La primera lectura del agente se conserva siempre: es la referencia para medir qué corrigió la persona.
+    if (!existsSync(join(dir, 'transcripcion.original.md'))) await writeFile(join(dir, 'transcripcion.original.md'), await readFile(join(dir, 'transcripcion.md'), 'utf8'))
     const docx = await docxHoja(dir, id, meta.entrega ?? '')
     await writeFile(
       join(dir, 'informe.json'),
@@ -225,19 +267,21 @@ switch (cmd) {
         2,
       ),
     )
-    await rename(dir, target)
-    console.log(`Cerrada: ${id} → ${toReview ? 'revision' : 'procesadas'}`)
+    if (dir !== target) await rename(dir, target)
+    console.log(`${enSitio ? 'Corregida en su sitio' : 'Cerrada'}: ${id} → ${toReview ? 'revision' : 'procesadas'}`)
     if (toReview) console.log(v.lint.needsReview.map((r) => `  ! ${r}`).join('\n'))
     console.log(`Documento: ${join(target, 'documento.docx')}`)
-    const completa = await conLock(() => ensamblarSiCompleta(meta.entrega ?? ''))
+    // Una corrección en su sitio no rehace el documento de la entrega (sería rehacerlo en cada hoja): se hace al final con `ensamblar`.
+    const completa = enSitio ? null : await conLock(() => ensamblarSiCompleta(meta.entrega ?? ''))
+    if (enSitio && meta.entrega) console.log(`El documento de la entrega no se ha rehecho: al terminar tus correcciones ejecuta  pnpm harness ensamblar "${meta.entrega}"`)
     if (completa) {
       console.log(`\nEntrega "${completa.entrega}" completa: ${completa.hojas} hoja(s) ensambladas en un solo documento, por actividad.`)
       console.log(`Documento: ${join(D.entregas, safeId(completa.entrega), 'documento.docx')}`)
       for (const x of completa.requierenRevision) console.log(`  ! ${x}`)
     }
-    if (flags.has('--siguiente')) {
+    if (flags.has('--siguiente') && !enSitio) {
       console.log('\n──────── Siguiente hoja ────────')
-      await tomarSiguiente(true)
+      await tomarSiguiente(true, meta.entrega ?? '')
     }
     break
   }
@@ -281,7 +325,7 @@ switch (cmd) {
     console.log(JSON.stringify(e, null, 2))
     if (preset || desde || flags.has('--variar')) {
       const r = await regenerarEntrega(entrega)
-      console.log(r ? `Documentos regenerados (${r.hojas} hoja(s)); no se volvió a procesar nada.` : 'Estilo guardado. Se aplicará al ensamblar la entrega.')
+      console.log(r ? `Documentos regenerados (${r.hojas} hoja(s)); no se volvió a procesar nada.` : 'Estilo guardado. El documento ensamblado se rehace al cerrar la última hoja de la entrega, o con: pnpm harness ensamblar <entrega>.')
     }
     break
   }
@@ -392,7 +436,7 @@ switch (cmd) {
     const porAct = new Map<string, { ids: string[]; refs: Set<string>; texto: string }>()
     const lista: { id: string; texto: string; refs: string[] }[] = []
     for (const h of hojas) {
-      const texto = await readFile(join(h.dir!, 'transcripcion.md'), 'utf8')
+      const texto = ocultarAuxiliares(await readFile(join(h.dir!, 'transcripcion.md'), 'utf8')) // las cuentas aparte (aux) no se verifican
       const refs = parseMarkers(texto).refs
       lista.push({ id: h.id, texto, refs })
       for (const a of new Set(refs.map((r) => r.split('/')[0]))) {
@@ -458,7 +502,10 @@ switch (cmd) {
       for (const x of f) console.log(`  ! ${x}`)
     }
     console.log('\n── Hojas a revisar ──')
-    for (const [id, m] of [...porHoja].sort((x, y) => natural(x[0], y[0]))) console.log(`  ${id}  [${[...m].join(', ')}]`)
+    for (const [id, m] of [...porHoja].sort((x, y) => natural(x[0], y[0]))) {
+      const h = hojas.find((x) => x.id === id || x.id.endsWith('__' + id))
+      console.log(`  ${id}  [${[...m].join(', ')}]  ${h ? `${h.id}  (${h.estado}/${h.id}/transcripcion.md)` : ''}`)
+    }
     console.log(`\n${total} observación(es) en ${porHoja.size} hoja(s). Cada una dice dónde volver a mirar la foto; ninguna se corrige sola.`)
     break
   }

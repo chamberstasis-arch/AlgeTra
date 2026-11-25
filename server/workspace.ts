@@ -2,9 +2,9 @@
 // Lo comparten la línea de comandos del agente (scripts/harness.ts) y la interfaz (server/ui.ts).
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { extname, join, resolve } from 'node:path'
+import { basename, extname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import JSZip from 'jszip'
 import { comparePage } from '../src/shared/metrics'
@@ -23,6 +23,7 @@ export const D = {
   procesadas: join(ROOT, 'procesadas'),
   revision: join(ROOT, 'revision'),
   entregas: join(ROOT, 'entregas'),
+  archivo: join(ROOT, 'archivo'),
 }
 export type Estado = 'por_procesar' | 'en_proceso' | 'procesadas' | 'revision'
 export const ESTADOS: Estado[] = ['por_procesar', 'en_proceso', 'procesadas', 'revision']
@@ -320,6 +321,91 @@ export async function agruparSueltas(entrega: string): Promise<{ movidas: number
   return { movidas: n, entrega: nombre }
 }
 
+// ───────── Archivo de entregas ─────────
+// Una entrega terminada sale de la cola (el agente ya no la ve) pero no se borra: todo lo suyo queda junto en
+// `archivo/<entrega>/` (hojas por estado, documento ensamblado y estilo) y se puede restaurar tal cual.
+
+export interface Archivada {
+  id: string
+  nombre: string
+  hojas: number
+  archivadaEn: string
+  tieneDocx: boolean
+}
+
+const ESTADOS_CERRADOS = ['procesadas', 'revision'] as const
+
+/** Saca la entrega de la cola y guarda todo lo suyo en `archivo/<entrega>/`. No toca nada si hay hojas en proceso. */
+export async function archivarEntrega(entrega: string): Promise<{ hojas: number; dir: string }> {
+  if (!entrega.trim()) throw new Error('Falta la entrega.')
+  return conLock(async () => {
+    const mias = (await listHojas()).filter((h) => h.entrega === entrega)
+    const ent = join(D.entregas, safeId(entrega))
+    if (!mias.length && !existsSync(ent)) throw new Error(`No existe la entrega "${entrega}".`)
+    const activas = mias.filter((h) => h.estado === 'en_proceso').length
+    if (activas) throw new Error(`Hay ${activas} hoja(s) en proceso por un agente; espera a que las cierre antes de archivar.`)
+    const dest = join(D.archivo, safeId(entrega))
+    if (existsSync(dest)) throw new Error(`Ya hay una entrega archivada con ese nombre (${dest}). Restáurala o renómbrala antes.`)
+    await mkdir(dest, { recursive: true })
+    let n = 0
+    const pend = join(D.por_procesar, entrega)
+    if (existsSync(pend)) {
+      await rename(pend, join(dest, 'por_procesar'))
+      n += mias.filter((h) => h.estado === 'por_procesar').length
+    }
+    for (const estado of ESTADOS_CERRADOS)
+      for (const h of mias.filter((x) => x.estado === estado)) {
+        await mkdir(join(dest, estado), { recursive: true })
+        await rename(h.dir!, join(dest, estado, basename(h.dir!)))
+        n++
+      }
+    if (existsSync(ent)) await rename(ent, join(dest, 'entrega'))
+    await writeFile(join(dest, 'archivo.json'), JSON.stringify({ entrega, archivadaEn: new Date().toISOString(), hojas: n }, null, 2))
+    return { hojas: n, dir: dest }
+  })
+}
+
+/** Entregas archivadas, de la más reciente a la más antigua. */
+export async function listarArchivadas(): Promise<Archivada[]> {
+  const out: Archivada[] = []
+  for (const id of await ls(D.archivo)) {
+    const info = await readFile(join(D.archivo, id, 'archivo.json'), 'utf8').then(JSON.parse).catch(() => null)
+    if (info) out.push({ id, nombre: info.entrega, hojas: info.hojas ?? 0, archivadaEn: info.archivadaEn ?? '', tieneDocx: existsSync(join(D.archivo, id, 'entrega', 'documento.docx')) })
+  }
+  return out.sort((a, b) => b.archivadaEn.localeCompare(a.archivadaEn))
+}
+
+/** Devuelve una entrega archivada a la cola, cada cosa a su carpeta. Si ya hay algo con ese nombre, no mueve nada. */
+export async function restaurarEntrega(id: string): Promise<{ entrega: string; hojas: number }> {
+  if (!id || id.includes('/') || id.includes('..')) throw new Error('Id no válido.')
+  return conLock(async () => {
+    const src = join(D.archivo, id)
+    const info = await readFile(join(src, 'archivo.json'), 'utf8').then(JSON.parse).catch(() => null)
+    if (!info) throw new Error('No existe esa entrega archivada.')
+    const entrega: string = info.entrega
+    const choques: string[] = []
+    if (existsSync(join(src, 'por_procesar')) && existsSync(join(D.por_procesar, entrega))) choques.push('hojas por procesar')
+    if (existsSync(join(src, 'entrega')) && existsSync(join(D.entregas, safeId(entrega)))) choques.push('documento ensamblado')
+    for (const estado of ESTADOS_CERRADOS) for (const h of await ls(join(src, estado))) if (existsSync(join(D[estado], h))) choques.push(`hoja ${h}`)
+    if (choques.length) throw new Error(`Ya hay una entrega activa con ese nombre (${choques.join(', ')}). Archívala o renómbrala antes de restaurar.`)
+    let n = 0
+    if (existsSync(join(src, 'por_procesar'))) {
+      n += (await ls(join(src, 'por_procesar'))).length
+      await rename(join(src, 'por_procesar'), join(D.por_procesar, entrega))
+    }
+    for (const estado of ESTADOS_CERRADOS)
+      for (const h of await ls(join(src, estado))) {
+        await rename(join(src, estado, h), join(D[estado], h))
+        n++
+      }
+    for (const estado of ESTADOS_CERRADOS) await rmdir(join(src, estado)).catch(() => {})
+    if (existsSync(join(src, 'entrega'))) await rename(join(src, 'entrega'), join(D.entregas, safeId(entrega)))
+    await rm(join(src, 'archivo.json'), { force: true })
+    await rmdir(src).catch(() => {}) // si quedó algo ajeno, se deja
+    return { entrega, hojas: n }
+  })
+}
+
 const miniaturas = new Map<string, Buffer>()
 /** JPEG pequeño de una imagen, para las vistas en cuadrícula (la foto completa pesa ~1 MB). Se guarda en memoria. */
 export async function miniatura(path: string, ancho = 260): Promise<Buffer> {
@@ -489,12 +575,16 @@ export async function ensamblarSiCompleta(entrega: string): Promise<Ensamblado |
 }
 
 /**
- * Rehace los DOCX de todas las hojas cerradas de la entrega y, si ya estaba ensamblada, el documento ensamblado
- * (con el mismo orden que tenía). Es lo que hace que cambiar el estilo o corregir una hoja no cueste procesar de nuevo.
+ * Rehace los DOCX de todas las hojas cerradas de la entrega y, si ya estaba ensamblada y no quedan hojas abiertas,
+ * el documento ensamblado (con el mismo orden que tenía). Es lo que hace que cambiar el estilo o corregir una hoja no cueste procesar de nuevo.
  */
 export async function regenerarEntrega(entrega: string): Promise<Ensamblado | null> {
-  const hojas = (await listHojas()).filter((h) => h.entrega === entrega && (h.estado === 'procesadas' || h.estado === 'revision') && h.dir)
+  const todas = (await listHojas()).filter((h) => h.entrega === entrega)
+  const hojas = todas.filter((h) => (h.estado === 'procesadas' || h.estado === 'revision') && h.dir)
   for (const h of hojas) await docxHoja(h.dir!, h.id, entrega)
+  // Con hojas todavía abiertas (en proceso o por procesar) el documento ensamblado NO se rehace: saldría sin ellas y
+  // reemplazaría al completo. Se rehace solo al cerrar la última hoja, o a mano con «Reensamblar».
+  if (todas.some((h) => h.estado === 'en_proceso' || h.estado === 'por_procesar')) return null
   const previo = await readFile(join(dirEntrega(entrega), 'ensamblado.json'), 'utf8').then(JSON.parse).catch(() => null)
   return previo ? ensamblar(entrega, { ordenOriginal: !!previo.ordenOriginal }) : null
 }

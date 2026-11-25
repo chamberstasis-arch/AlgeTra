@@ -24,6 +24,25 @@ describe('normalizarEstilo', () => {
   })
 })
 
+describe('tipografía de los títulos', () => {
+  it('el preset uv: Carta, Gill Sans MT 15 en títulos, Times New Roman 12, sin colores y actividad en hoja nueva', () => {
+    const e = normalizarEstilo(PRESETS.uv)
+    expect(e).toMatchObject({ papel: 'Carta', fuente: 'Times New Roman', tamano: 12, fuenteTitulos: 'Gill Sans MT', tamanoTitulos: 15, colorTitulos: '000000', saltoActividad: true })
+    expect(e.grafica.paleta).toBe('mono')
+  })
+  it('es opcional: sin ella los títulos siguen a la del texto y los demás presets no cambian', () => {
+    const e = normalizarEstilo(PRESETS.limpio)
+    expect(e.fuenteTitulos).toBeUndefined()
+    expect(e.tamanoTitulos).toBeUndefined()
+  })
+  it('rechaza tipografías raras y recorta el tamaño', () => {
+    expect(normalizarEstilo({ fuenteTitulos: 'Comic Papyrus' }).fuenteTitulos).toBeUndefined()
+    expect(normalizarEstilo({ tamanoTitulos: 99 }).tamanoTitulos).toBe(20)
+    expect(normalizarEstilo({ tamanoTitulos: '' }).tamanoTitulos).toBeUndefined()
+    expect(normalizarEstilo(normalizarEstilo(PRESETS.uv))).toEqual(normalizarEstilo(PRESETS.uv))
+  })
+})
+
 describe('variarEstilo', () => {
   it('la misma semilla da siempre el mismo estilo', () => {
     expect(variarEstilo('entrega-1')).toEqual(variarEstilo('entrega-1'))

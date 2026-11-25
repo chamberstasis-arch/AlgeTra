@@ -45,7 +45,7 @@ Alternativa a la aplicación de Mathpix: un **agente de IA** hace de trabajador 
 
 1. `pnpm ui` → abre **http://localhost:8080** (o el siguiente puerto libre). Ahí subes fotos, PDF o DOCX (todo se convierte a imágenes), ves la cola, los resultados, el PDF y descargas DOCX/PDF.
 2. Pon un nombre de **entrega** por alumno/actividad: sus hojas se ensamblan juntas, ordenadas por ejercicio e inciso.
-3. Abre tu herramienta de agentes en la raíz del repo y pega el prompt (botón **Copiar prompt de inicio**, o `harness/PROMPT_INICIO.md` / `harness/PROMPT_ENTREGA.md`). El agente usa `pnpm harness siguiente → validar → cerrar`.
+3. Abre tu herramienta de agentes en la raíz del repo y pega el prompt (en la pestaña **Pasos** de la entrega, botón **Copiar prompt**; ya lleva el nombre de la entrega y su estado, así no se mezcla con otras de la cola. Las plantillas están en `harness/PROMPT_*.md`). El agente usa `pnpm harness siguiente → validar → cerrar`.
 4. Las hojas limpias quedan en `trabajo/procesadas/`; las que tengan `[?]`, dudas, escala inferida o figuras sin dibujar, en `trabajo/revision/`.
 5. Tú revisas: editas `transcripcion.md` si hace falta y ejecutas `pnpm harness aprobar <id>` (regenera el DOCX con tu versión y mide al agente). Si algo se repite, `pnpm harness aprender "regla"`. `pnpm harness reabrir <id>` devuelve una hoja al agente. `pnpm harness ensamblar <entrega>` (o el botón de la interfaz) une la entrega.
 6. `pnpm harness medir` resume la exactitud sobre las hojas aprobadas.

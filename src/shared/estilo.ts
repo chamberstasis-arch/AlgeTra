@@ -5,7 +5,7 @@
 // mal escrito a mano nunca produce un documento roto.
 
 /** Tipografías admitidas. Las seis primeras son las que usa la variación automática; el resto se admiten (p. ej. al copiar un ejemplo). */
-export const FUENTES = ['Calibri', 'Cambria', 'Arial', 'Times New Roman', 'Georgia', 'Verdana', 'Aptos', 'Garamond', 'Tahoma', 'Trebuchet MS', 'Palatino Linotype', 'Book Antiqua'] as const
+export const FUENTES = ['Calibri', 'Cambria', 'Arial', 'Times New Roman', 'Georgia', 'Verdana', 'Aptos', 'Garamond', 'Tahoma', 'Trebuchet MS', 'Palatino Linotype', 'Book Antiqua', 'Gill Sans MT'] as const
 export const FUENTES_VARIAR = FUENTES.slice(0, 6)
 
 export const PALETAS: Record<string, { nombre: string; colores: string[] }> = {
@@ -35,8 +35,12 @@ export interface Estilo {
   /** Semilla con la que se generó una variación (para poder reproducirla). */
   semilla?: string
   fuente: string
+  /** Tipografía de los títulos de actividad; sin ella, la del texto. */
+  fuenteTitulos?: string
   /** Puntos; admite medios puntos. */
   tamano: number
+  /** Tamaño del título de actividad (negritas); sin él, proporcional al del texto. */
+  tamanoTitulos?: number
   interlineado: number
   margenCm: number
   papel: 'A4' | 'Carta'
@@ -56,6 +60,7 @@ export interface Estilo {
 
 export const LIMITES = {
   tamano: [10, 14],
+  tamanoTitulos: [12, 20],
   interlineado: [1, 2],
   margenCm: [1.5, 3.5],
   ancho: [30, 100],
@@ -92,6 +97,12 @@ export const PRESETS: Record<string, Estilo> = {
     ...BASE, nombre: 'formal', fuente: 'Times New Roman', tamano: 12, interlineado: 1.5, margenCm: 3, alinear: 'justificado', ecuaciones: 'centradas', espaciado: 'amplio', colorTitulos: '000000', numeracion: true,
     grafica: { ancho: 60, paleta: 'sobria', grosor: 2, cuadricula: 'suave', etiquetas: 14 },
   },
+  // Formato pedido por un cliente: títulos de actividad en Gill Sans MT 15 negritas, texto en Times New Roman 12,
+  // sin colores (títulos negros, gráficas en grises), papel Carta y cada actividad en hoja nueva.
+  uv: {
+    ...BASE, nombre: 'uv', papel: 'Carta', fuente: 'Times New Roman', tamano: 12, fuenteTitulos: 'Gill Sans MT', tamanoTitulos: 15, colorTitulos: '000000', saltoActividad: true,
+    grafica: { ancho: 65, paleta: 'mono', grosor: 2.2, cuadricula: 'suave', etiquetas: 14 },
+  },
   compacto: {
     ...BASE, nombre: 'compacto', fuente: 'Arial', tamano: 11, interlineado: 1.1, margenCm: 1.5, espaciado: 'compacto', colorTitulos: '1F3864',
     grafica: { ancho: 55, paleta: 'clasica', grosor: 2.2, cuadricula: 'suave', etiquetas: 14 },
@@ -115,6 +126,8 @@ export function normalizarEstilo(raw: unknown): Estilo {
     nombre: typeof r.nombre === 'string' && r.nombre.trim() ? r.nombre.trim().slice(0, 40) : BASE.nombre,
     ...(typeof r.semilla === 'string' ? { semilla: r.semilla.slice(0, 120) } : {}),
     fuente: pick(r.fuente, FUENTES, BASE.fuente as (typeof FUENTES)[number]),
+    ...(FUENTES.includes(r.fuenteTitulos as (typeof FUENTES)[number]) ? { fuenteTitulos: r.fuenteTitulos as string } : {}),
+    ...(r.tamanoTitulos === undefined || r.tamanoTitulos === '' || r.tamanoTitulos === null ? {} : { tamanoTitulos: round2(clamp(r.tamanoTitulos, LIMITES.tamanoTitulos, 15, 0.5)) }),
     tamano: round2(clamp(r.tamano, LIMITES.tamano, BASE.tamano, 0.5)),
     interlineado: round2(clamp(r.interlineado, LIMITES.interlineado, BASE.interlineado, 0.05)),
     margenCm: round2(clamp(r.margenCm, LIMITES.margenCm, BASE.margenCm, 0.1)),
