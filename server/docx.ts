@@ -135,16 +135,28 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
         return `<w:p>${ppr}${inlines(b.inlines)}</w:p>`
       }
       case 'table': {
+        // Tablas de valores compactas: letra más chica, sin aire entre renglones y anchas solo lo que su contenido pide.
         const border = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
-          .map((s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="808080"/>`)
+          .map((s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="A0A0A0"/>`)
           .join('')
+        // Ancho de cada columna según su contenido más largo (tablas de valores: números cortos, columnas angostas).
+        const largo = (c: (typeof b.rows)[number][number]) => c.reduce((n, i) => n + (i.t === 'math' ? i.latex.replace(/\\[a-z]+|[{}^_]/g, '').length : i.text.length), 0)
+        const ncol = Math.max(...b.rows.map((r) => r.length))
+        const ancho = Array.from({ length: ncol }, (_, j) => Math.min(3200, Math.max(560, Math.max(...b.rows.map((r) => (r[j] ? largo(r[j]) : 0))) * 130 + 260)))
         const rows = b.rows
           .map(
             (r) =>
-              `<w:tr>${r.map((c) => `<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p>${inlines(c)}</w:p></w:tc>`).join('')}</w:tr>`,
+              `<w:tr><w:trPr><w:cantSplit/></w:trPr>${r
+                .map((c, j) => `<w:tc><w:tcPr><w:tcW w:w="${ancho[j] ?? 1000}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="TablaCelda"/></w:pPr>${inlines(c)}</w:p></w:tc>`)
+                .join('')}</w:tr>`,
           )
           .join('')
-        return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>${border}</w:tblBorders></w:tblPr>${rows}</w:tbl><w:p/>`
+        const mar = (l: string, v: number) => `<w:${l} w:w="${v}" w:type="dxa"/>`
+        return (
+          `<w:tbl><w:tblPr><w:tblW w:w="${ancho.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblInd w:w="${E.ecuaciones === 'izquierda' ? 340 : 0}" w:type="dxa"/><w:tblBorders>${border}</w:tblBorders>` +
+          `<w:tblLayout w:type="autofit"/><w:tblCellMar>${mar('top', 15)}${mar('left', 100)}${mar('bottom', 15)}${mar('right', 100)}</w:tblCellMar></w:tblPr><w:tblGrid>${ancho.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rows}</w:tbl>` +
+          `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"/></w:pPr></w:p>`
+        )
       }
     }
   }
@@ -178,6 +190,7 @@ export function buildDocx(opts: DocxOptions): Promise<DocxResult> {
 <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}" w:cs="${f}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:val="es-ES"/></w:rPr></w:rPrDefault>
 <w:pPrDefault><w:pPr><w:spacing w:after="${tw(60)}" w:line="${Math.round(E.interlineado * 240)}" w:lineRule="auto"/>${E.alinear === 'justificado' ? '<w:jc w:val="both"/>' : ''}</w:pPr></w:pPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>
+<w:style w:type="paragraph" w:customStyle="1" w:styleId="TablaCelda"><w:name w:val="Tabla celda"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr><w:rPr><w:sz w:val="${Math.max(16, Math.round(sz * 0.8))}"/><w:szCs w:val="${Math.max(16, Math.round(sz * 0.8))}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="60"/><w:jc w:val="left"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.67)}"/><w:szCs w:val="${h(1.67)}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="240"/><w:jc w:val="left"/></w:pPr><w:rPr><w:color w:val="666666"/><w:sz w:val="${h(0.92)}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="${tw(360)}" w:after="${tw(120)}"/><w:jc w:val="left"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${h(1.25)}"/><w:szCs w:val="${h(1.25)}"/></w:rPr></w:style>

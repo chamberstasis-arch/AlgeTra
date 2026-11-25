@@ -755,6 +755,8 @@ export interface AnswerCheck {
  * La resolución puede variar; el resultado final no. Se acepta cualquier lado de cualquier
  * igualdad, para no depender del método ni del orden.
  */
+const unBoxed = (t: string) => t.replace(/\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}/g, '$1')
+
 export function checkExpectedAnswer(expectedLatex: string, text: string): AnswerCheck {
   const exp = evaluateLatex(expectedLatex)
   if (!exp.ok) return { expected: expectedLatex, status: 'unverifiable', detail: `La respuesta de referencia no es evaluable (${exp.reason}).` }
@@ -763,6 +765,12 @@ export function checkExpectedAnswer(expectedLatex: string, text: string): Answer
   for (const eqn of extractEquations(text)) {
     const c = checkEquation(eqn)
     written.push(...c.written)
+    // Cada lado de la igualdad que sea evaluable por sí solo (p. ej. `proy_v u = \frac{3}{2}i+\frac{3}{2}j`, donde el
+    // lado izquierdo no se puede calcular pero lo escrito después de `=` es el resultado; solo si la igualdad no se evaluó) también cuenta como valor escrito.
+    for (const piece of c.written.length ? [] : ((p) => (p.length > 1 ? p.slice(1) : p))(unBoxed(eqn).split('='))) {
+      const r = piece.trim() ? evaluateLatex(piece) : null
+      if (r?.ok && !written.some((w) => valueEquals(w, r.value))) written.push(r.value)
+    }
     // Una matriz suelta (sin "=") también cuenta como valor escrito.
     if (!c.sides.length) {
       const slots: Slot[] = []

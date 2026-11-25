@@ -109,6 +109,14 @@ describe('limpieza de formato del documento', () => {
     expect((p.doc.match(/<w:tr>/g) ?? []).length).toBe(3)
     expect(p.doc).not.toContain('|---|')
   })
+  it('las tablas son compactas: rejilla con anchos por contenido, estilo de celda chico y sin espacio entre renglones', async () => {
+    const p = await partes((await con('| $x$ | $y_1$ |\n|---|---|\n| 4 | 3 |')).buffer)
+    expect(p.doc).toMatch(/<w:tblGrid><w:gridCol w:w="\d+"\/><w:gridCol w:w="\d+"\/><\/w:tblGrid>/)
+    expect(p.doc).toContain('<w:pStyle w:val="TablaCelda"/>')
+    expect(p.styles).toMatch(/w:styleId="TablaCelda"[\s\S]*?w:after="0"/)
+    expect(p.styles).toMatch(/w:styleId="TablaCelda"[\s\S]*?<w:sz w:val="(?:1[6-9]|2[0-2])"\/>/)
+    expect(Number(/<w:tblW w:w="(\d+)"/.exec(p.doc)![1])).toBeLessThan(3000)
+  })
   it('los espacios de \\qquad dentro de una fórmula se escriben como texto normal (no se colapsan)', async () => {
     const p = await partes((await con('$$a=1 \\qquad b=2$$')).buffer)
     expect(p.doc).toMatch(/<m:nor\/>[\s\S]*?<m:t xml:space="preserve">  <\/m:t>/)

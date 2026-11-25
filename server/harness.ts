@@ -1,5 +1,5 @@
 // Lógica pura del entorno de trabajo del agente (sin E/S): marcas, validación y reglas de cierre.
-import { extractEquations } from '../src/shared/mmd'
+import { extractEquations, quitarAuxiliares } from '../src/shared/mmd'
 import type { ChecksResponse } from '../src/shared/types'
 
 export interface Markers {
@@ -18,7 +18,7 @@ export function parseMarkers(source: string): Markers {
   const refs: string[] = []
   const doubts: string[] = []
   const comments: string[] = []
-  const body = source
+  const body = quitarAuxiliares(source)
     .replace(/<!--([\s\S]*?)-->/g, (_, inner: string) => {
       const t = inner.trim()
       comments.push(t)
@@ -127,6 +127,28 @@ export interface Segment {
 
 const REF_RE = /^(.+?)\/(\d+)([a-z]?)$/i
 
+const ENUNCIADO_RE = /^(?:resolver|resuelva|encuentre|encuentra|calcule|calcula|determine|realice|realizar|reducir|busque|sea|sean|dados|dado|utilice|obtenga|use|usando|demuestre|grafique|graficar|bosqueje|escriba|halle|hallar|identifique|con las matrices|con los vectores)\b/i
+
+/**
+ * Separa del final de un texto las líneas de enunciado (hasta 3, sin fórmulas ni figuras) que el alumno escribió justo
+ * antes de empezar el ejercicio: pertenecen al ejercicio que viene, no al anterior.
+ */
+export function separarEnunciado(text: string): [string, string] {
+  const lines = text.replace(/\s+$/, '').split('\n')
+  const tomar: string[] = []
+  while (lines.length && tomar.length < 3) {
+    const l = lines[lines.length - 1].trim()
+    if (!l) {
+      lines.pop()
+      continue
+    }
+    if (/\$\$|```|^\|/.test(l)) break
+    if (!(ENUNCIADO_RE.test(l) || l.endsWith(':') || /siguiente/i.test(l))) break
+    tomar.unshift(lines.pop()!)
+  }
+  return [lines.join('\n'), tomar.join('\n')]
+}
+
 /** Parte una transcripción en segmentos en cada `<!-- ejercicio: … -->` o `<!-- inciso: … -->`. */
 export function splitSegments(source: string, page: number): Segment[] {
   const segs: Segment[] = []
@@ -139,11 +161,13 @@ export function splitSegments(source: string, page: number): Segment[] {
   for (const m of source.matchAll(re)) {
     flush(source.slice(last, m.index))
     last = (m.index ?? 0) + m[0].length
+    let enunciado = ''
+    if (m[1].toLowerCase() === 'ejercicio') [cur.text, enunciado] = separarEnunciado(cur.text)
     segs.push(cur)
     if (m[1].toLowerCase() === 'ejercicio') {
       const first = m[2].split(/[,\s]+/)[0] ?? ''
       const r = REF_RE.exec(first)
-      cur = { act: r ? r[1] : first, ej: r ? r[2] : '', inciso: r ? r[3].toLowerCase() : '', page, text: '', marked: true }
+      cur = { act: r ? r[1] : first, ej: r ? r[2] : '', inciso: r ? r[3].toLowerCase() : '', page, text: enunciado ? enunciado + '\n' : '', marked: true }
     } else {
       cur = { ...cur, inciso: m[2].trim().toLowerCase().replace(/[^a-z0-9ivx]/g, ''), text: '', marked: true }
     }
@@ -274,4 +298,40 @@ export function revisarFormato(body: string): string[] {
   const graf = (body.match(/\[Gr[aá]fica/g) ?? []).length
   if (graf) out.push(`${graf} figura(s) quedaron solo descritas con texto ([Gráfica…]); hay que dibujarlas o revisarlas.`)
   return out
+}
+
+// ───────── Depuración de transcripciones ya hechas ─────────
+
+/** Actividades de vectores (los símbolos i, j, k son vectores unitarios y se escriben en negrita recta). */
+export const ACT_VECTORES = new Set([9, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25])
+
+const UNITARIO_RE = /(?<![A-Za-z\\_{^])([ijk])(?![A-Za-z_{(\\0-9^])/g
+
+/** `2i + 3j` → `2\mathbf{i} + 3\mathbf{j}` dentro de las fórmulas (nunca en el texto corrido). */
+export function normalizarUnitarios(text: string): string {
+  const arreglar = (math: string) =>
+    math
+      .split(/(\\(?:text|operatorname|mathrm)\{[^}]*\})/)
+      .map((t, i) => (i % 2 ? t : t.replace(UNITARIO_RE, '\\mathbf{$1}')))
+      .join('')
+  return text
+    .replace(/\$\$([^$]+)\$\$/g, (_m, c: string) => `$$${arreglar(c)}$$`)
+    .replace(/(?<!\$)\$([^$\n]+)\$(?!\$)/g, (_m, c: string) => `$${arreglar(c)}$`)
+}
+
+/** Sumas y restas "a dos pisos" (array con \hline): se pasan a un bloque ```aux, fuera del documento. */
+export function envolverAuxiliares(text: string): string {
+  return text
+    .split('\n')
+    .map((l) => {
+      const t = l.trim()
+      return t.startsWith('$$') && t.endsWith('$$') && /\\begin\{array\}/.test(t) && /\\hline/.test(t) ? `\`\`\`aux\n${t}\n\`\`\`` : l
+    })
+    .join('\n')
+}
+
+export function depurarTexto(text: string, opts: { unitarios: boolean }): string {
+  let t = envolverAuxiliares(text)
+  if (opts.unitarios) t = normalizarUnitarios(t)
+  return t
 }

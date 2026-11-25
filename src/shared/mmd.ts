@@ -97,8 +97,14 @@ function parseTabular(body: string): Inline[][][] {
   return rows
 }
 
+/**
+ * Bloques ```aux … ```: sumas y restas auxiliares escritas "a dos pisos" al margen. Se conservan en la transcripción
+ * (para revisarlas) pero no entran al documento ni a las verificaciones.
+ */
+export const quitarAuxiliares = (source: string): string => source.replace(/```aux[ \t]*\n[\s\S]*?```[ \t]*\n?/g, '')
+
 export function parseMmd(source: string): Block[] {
-  const text = source.replace(/\r\n?/g, '\n')
+  const text = quitarAuxiliares(source).replace(/\r\n?/g, '\n')
   const blocks: Block[] = []
   let last = 0
   for (const m of text.matchAll(BLOCK_RE)) {

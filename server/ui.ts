@@ -9,6 +9,7 @@ import { FUENTES, LIMITES, PALETAS, PRESETS, variarEstilo } from '../src/shared/
 import { D, ESTADOS, agruparSueltas, aprobarHoja, docxToPdf, ensamblar, ensureDirs, guardarEstilo, guardarTranscripcion, ingest, leerEstilo, listHojas, ls, miniatura, regenerarEntrega, toolsAvailable, type Estado, type Hoja } from './workspace'
 import { safeId } from './harness'
 import { extraerFormato } from './formato'
+import { guardarComentarios, leerComentarios, normalizarComentarios } from './comentarios'
 
 const app = Fastify({ logger: { level: 'warn' }, bodyLimit: 1024 * 1024 })
 await app.register(multipart, { limits: { fileSize: 600 * 1024 * 1024, files: 200 } })
@@ -24,7 +25,7 @@ const extOf = (p: string) => p.split('.').pop()!.toLowerCase()
 app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(await readFile(resolve('ui/index.html'), 'utf8')))
 
 app.get<{ Querystring: { tipo?: string } }>('/api/prompt', async (req, reply) => {
-  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : req.query.tipo === 'contraste' ? 'harness/PROMPT_CONTRASTE.md' : 'harness/PROMPT_INICIO.md')
+  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : req.query.tipo === 'contraste' ? 'harness/PROMPT_CONTRASTE.md' : req.query.tipo === 'comentarios' ? 'harness/PROMPT_COMENTARIOS.md' : 'harness/PROMPT_INICIO.md')
   return reply.type('text/plain; charset=utf-8').send(existsSync(p) ? await readFile(p, 'utf8') : '')
 })
 
@@ -198,6 +199,20 @@ app.put<{ Body: { estado: string; id: string; texto: string } }>('/api/transcrip
     return await guardarTranscripcion(dir, id, await entregaDe(dir), String(texto ?? ''))
   } catch (e) {
     throw bad(e instanceof Error ? e.message : 'No se pudo guardar.')
+  }
+})
+
+app.get<{ Querystring: { estado: string; id: string } }>('/api/comentarios', async (req) => leerComentarios(dirHoja(req.query.estado, req.query.id)))
+
+app.put<{ Body: { estado: string; id: string; comentarios: unknown } }>('/api/comentarios', async (req) => {
+  const { estado, id, comentarios } = req.body ?? ({} as any)
+  const dir = dirHoja(estado, id)
+  try {
+    const lista = normalizarComentarios(comentarios, await leerComentarios(dir))
+    await guardarComentarios(dir, lista)
+    return { total: lista.length, pendientes: lista.filter((c) => c.estado === 'pendiente').length }
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudieron guardar los comentarios.')
   }
 })
 

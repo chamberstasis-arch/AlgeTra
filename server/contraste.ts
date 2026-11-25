@@ -8,6 +8,11 @@ const COORD_RE = /\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)(?:\s*,\s*(-?\d+
 
 /** Sistema del enunciado (`aligned` con ecuaciones lineales) como matriz aumentada [A|b]; null si no se entiende. */
 export function sistemaAMatriz(latex: string): Mat | null {
+  return sistemaConVariables(latex)?.mat ?? null
+}
+
+/** Igual que `sistemaAMatriz`, con los nombres de las variables en el orden de las columnas. */
+export function sistemaConVariables(latex: string): { mat: Mat; vars: string[] } | null {
   const body = /\\begin\{(?:aligned|array|cases)\}(?:\{[^}]*\})?([\s\S]*?)\\end\{(?:aligned|array|cases)\}/.exec(latex)?.[1] ?? latex
   const eqs = body.split(/\\\\/).map((r) => r.replace(/&/g, '').trim()).filter(Boolean)
   if (eqs.length < 2 || !eqs.every((e) => e.includes('='))) return null
@@ -34,7 +39,7 @@ export function sistemaAMatriz(latex: string): Mat | null {
     rhs.push(b)
   }
   const zero = frac(0n)
-  return { kind: 'mat', rows: rows.map((row, i) => [...vars.map((v) => row[v] ?? zero), rhs[i]]) }
+  return { mat: { kind: 'mat', rows: rows.map((row, i) => [...vars.map((v) => row[v] ?? zero), rhs[i]]) }, vars }
 }
 
 const norm = (s: string) => s.replace(/[−–]/g, '-').replace(/\\left|\\right|[\s{}]/g, '')
@@ -231,6 +236,21 @@ export function verificarCadena(texto: string): string[] {
     }
     ultima = nueva
     pendiente = null
+  })
+  return out
+}
+
+/**
+ * Renglones con varias columnas del cuaderno pegadas en una sola fórmula (≥4 bloques separados por \qquad), que suelen
+ * ser pasos de ejercicios distintos intercalados: se piden separados, uno por columna.
+ */
+export function estructuraIntercalada(texto: string): string[] {
+  const out: string[] = []
+  texto.split('\n').forEach((l, i) => {
+    const t = l.trim()
+    if (!t.startsWith('$$') || /\\begin\{(?:array|aligned|cases)\}/.test(t)) return
+    const bloques = t.split(/\\qquad|\;\;\;/).filter((b) => /[=a-zA-Z0-9]/.test(b))
+    if (bloques.length >= 4 && (t.match(/=/g) ?? []).length >= 3) out.push(`renglón ${i + 1}: ${bloques.length} bloques en una fórmula; ¿son columnas o ejercicios distintos? Sepáralos (uno por columna, con su marca de inciso).`)
   })
   return out
 }

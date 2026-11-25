@@ -1,16 +1,20 @@
 // Herramientas locales del agente de transcripción. No llaman a ningún servicio externo.
-// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|contrastar|figuras|medir|aprender> [...]
+// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|contrastar|figuras|resolver|depurar|comentarios|atender|medir|aprender> [...]
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { comparePage } from '../src/shared/metrics'
-import { runChecks } from '../server/checks'
+import { runChecks, summarize } from '../server/checks'
 import { findExercises, loadCorpus } from '../server/corpus'
 import { buildDocx } from '../server/docx'
 import { extraerFormato } from '../server/formato'
-import { contrastar, contrastarFiguras, verificarCadena } from '../server/contraste'
+import { contrastar, estructuraIntercalada, contrastarFiguras, verificarCadena } from '../server/contraste'
 import { renderFigure } from '../server/figures'
-import { isArithmeticError, lintTranscription, revisarFormato, parseMarkers, safeId } from '../server/harness'
+import { resolver } from '../server/resolver'
+import { guardarComentarios, leerComentarios, ubicar } from '../server/comentarios'
+import { checkExpectedAnswer } from '../src/shared/linalg'
+import { corpusDir } from '../server/corpus'
+import { ACT_VECTORES, depurarTexto, isArithmeticError, lintTranscription, revisarFormato, parseMarkers, safeId } from '../server/harness'
 import { PRESETS, variarEstilo } from '../src/shared/estilo'
 import { D, ROOT, GUIA_CALIDAD, conLock, agruparSueltas, analyzeImage, aprobarHoja, docxHoja, enhanceImage, ensamblar, ensamblarSiCompleta, ensureDirs, ingest, guardarEstilo, leerEstilo, listHojas, ls, natural, normalizarOrientacion, regenerarEntrega } from '../server/workspace'
 
@@ -282,6 +286,103 @@ switch (cmd) {
     break
   }
 
+  case 'comentarios': {
+    // pnpm harness comentarios <entrega|id>: comentarios pendientes que dejó la persona en la revisión por renglones.
+    // El agente atiende SOLO esos renglones (mira la foto ahí), edita la transcripción y marca `atender`.
+    if (!positional[0]) die('Uso: pnpm harness comentarios <entrega|id>', 2)
+    const hojas = (await listHojas()).filter((h) => h.dir && (h.entrega === positional[0] || h.id === positional[0]))
+    let pend = 0
+    for (const h of hojas) {
+      const lista = (await leerComentarios(h.dir!)).filter((c) => c.estado === 'pendiente')
+      if (!lista.length) continue
+      const lineas = (await readFile(join(h.dir!, 'transcripcion.md'), 'utf8').catch(() => '')).split('\n')
+      pend += lista.length
+      console.log(`\n${h.id}  (${h.estado})  carpeta: ${h.dir}`)
+      for (const c of lista) {
+        const l = ubicar(c, lineas)
+        console.log(`  #${c.id} renglón ${l}: ${(lineas[l - 1] ?? '').trim().slice(0, 110)}\n      → ${c.texto}`)
+      }
+    }
+    console.log(pend ? `\n${pend} comentario(s) pendiente(s). Tras atender cada uno: pnpm harness atender <id> <n|todos> [--nota "qué hiciste"] y luego pnpm harness cerrar <id>.` : 'Sin comentarios pendientes.')
+    break
+  }
+
+  case 'atender': {
+    // pnpm harness atender <id> <n,n|todos> [--nota "…"]: marca comentarios como resueltos.
+    const h = (await listHojas()).find((x) => x.id === positional[0] && x.dir)
+    if (!h || !positional[1]) die('Uso: pnpm harness atender <id> <n,n|todos> [--nota "…"]', 2)
+    const lista = await leerComentarios(h!.dir!)
+    const ids = positional[1] === 'todos' ? lista.map((c) => c.id) : positional[1].split(',').map(Number)
+    const nota = rest[rest.indexOf('--nota') + 1]
+    let n = 0
+    for (const c of lista) if (ids.includes(c.id) && c.estado === 'pendiente') (c.estado = 'resuelto'), (c.respuesta = flags.has('--nota') ? nota : c.respuesta), n++
+    await guardarComentarios(h!.dir!, lista)
+    console.log(`${n} comentario(s) marcados como resueltos en ${h!.id}.`)
+    break
+  }
+
+  case 'depurar': {
+    // pnpm harness depurar <entrega> [--aplicar]: sumas a dos pisos → bloque aux (fuera del documento) y vectores
+    // unitarios i, j, k en negrita recta. Sin --aplicar solo cuenta lo que cambiaría.
+    if (!positional[0]) die('Uso: pnpm harness depurar <entrega> [--aplicar]', 2)
+    const hojas = (await listHojas()).filter((h) => h.entrega === positional[0] && (h.estado === 'procesadas' || h.estado === 'revision') && h.dir)
+    let cambiadas = 0
+    for (const h of hojas) {
+      const f = join(h.dir!, 'transcripcion.md')
+      const antes = await readFile(f, 'utf8')
+      const acts = [...antes.matchAll(/ejercicio:\s*act-(\d+)/g)].map((m) => Number(m[1]))
+      const vect = acts.length > 0 && acts.every((a) => ACT_VECTORES.has(a))
+      const despues = depurarTexto(antes, { unitarios: vect })
+      if (despues === antes) continue
+      cambiadas++
+      const aux = (despues.match(/```aux/g) ?? []).length - (antes.match(/```aux/g) ?? []).length
+      console.log(`  ${h.id.replace(/^.*__/, '')}: ${aux ? `${aux} suma(s) auxiliar(es) apartada(s)` : ''}${aux && vect ? '; ' : ''}${vect ? 'vectores unitarios normalizados' : ''}`)
+      if (flags.has('--aplicar')) {
+        await writeFile(join(h.dir!, 'transcripcion.antes-de-depurar.md'), antes)
+        await writeFile(f, despues)
+      }
+    }
+    if (flags.has('--aplicar') && cambiadas) {
+      await regenerarEntrega(positional[0])
+      console.log(`Aplicado a ${cambiadas} hoja(s); documentos regenerados.`)
+    } else console.log(`${cambiadas} hoja(s) cambiarían.${cambiadas ? ' Usa --aplicar para escribirlo.' : ''}`)
+    break
+  }
+
+  case 'resolver': {
+    // pnpm harness resolver [--escribir]: resuelve todos los ejercicios de la base con los métodos del curso.
+    // Con --escribir añade "**Respuesta:**" a cada ejercicio (así el verificador compara resultados finales) y deja el
+    // procedimiento en corpus/soluciones/. Estas respuestas NO se muestran a quien transcribe.
+    const { readdir } = await import('node:fs/promises')
+    const acts = await loadCorpus()
+    let n = 0
+    let sin = 0
+    for (const a of acts) {
+      const file = join(corpusDir, a.file)
+      let src = await readFile(file, 'utf8')
+      const sol: string[] = [`# ${a.id} — ${a.title}`, '', 'Resolución de referencia (no mostrar a quien transcribe).', '']
+      for (const e of a.exercises) {
+        const s = resolver(a.id, e.number, e.statement)
+        if (!s) { sin++; console.log(`  sin solución: ${e.ref}`); continue }
+        n++
+        let texto = s.respuesta.replace(/\$\$?/g, '')
+        if (s.formulas.some((f) => texto.trim() === f)) texto = ''
+        const bloque = `**Respuesta:** ${texto}${s.formulas.length ? '\n' + s.formulas.map((f) => `$$${f}$$`).join('\n') : ''}`
+        sol.push(`## Ejercicio ${e.number}`, '', ...s.procedimiento.map((p) => `$$${p}$$`), '', bloque, '')
+        const re = new RegExp(`(## Ejercicio ${e.number}\\s*\\n[\\s\\S]*?)(?:\\n\\s*\\*\\*Respuestas?:\\*\\*[\\s\\S]*?)?(?=\\n## Ejercicio |$)`)
+        src = src.replace(re, (_m, enun: string) => `${enun.replace(/\s+$/, '')}\n\n${bloque}\n`)
+      }
+      if (flags.has('--escribir')) {
+        await writeFile(file, src.replace(/\n+$/, '\n'))
+        await mkdir(join(corpusDir, '..', 'soluciones'), { recursive: true })
+        await writeFile(join(corpusDir, '..', 'soluciones', a.file), sol.join('\n') + '\n')
+      }
+    }
+    void readdir
+    console.log(`${n} ejercicio(s) resueltos, ${sin} sin solución.${flags.has('--escribir') ? ' Escrito en corpus/actividades y corpus/soluciones.' : ' (vista previa; usa --escribir para guardar)'}`)
+    break
+  }
+
   case 'contrastar': {
     // pnpm harness contrastar <entrega>: lista de trabajo para la revisión contra el enunciado (sin mirar fotos).
     // Agrupa las hojas por actividad, así una matriz o un punto que está en otra hoja de la misma actividad no da falso aviso.
@@ -323,6 +424,29 @@ switch (cmd) {
       console.log(`\n${l.id.replace(/^.*__/, '')}`)
       for (const x of v) console.log(`  ✘ ${x}`)
     }
+    console.log('\n── Estructura (columnas o pasos intercalados en un mismo renglón) ──')
+    for (const l of lista) {
+      const e = estructuraIntercalada(l.texto)
+      if (!e.length) continue
+      total += e.length
+      marca(l.id.replace(/^.*__/, ''), 'estructura')
+      console.log(`\n${l.id.replace(/^.*__/, '')}`)
+      for (const x of e) console.log(`  ! ${x}`)
+    }
+    console.log('\n── Resultado final (sin mostrar el valor esperado; se compara con la resolución de referencia) ──')
+    const estados = { found: 0, mismatch: 0, 'not-found': 0, unverifiable: 0 }
+    for (const [a, g] of [...porAct].sort((x, y) => natural(x[0], y[0]))) {
+      for (const e of await findExercises([...g.refs])) {
+        const st = summarize(e.answers.map((r) => checkExpectedAnswer(r, g.texto).status))
+        estados[st]++
+        if (st !== 'mismatch' && st !== 'not-found') continue
+        total++
+        const donde = lista.filter((l) => l.refs.includes(e.ref)).map((l) => l.id.replace(/^.*__/, ''))
+        donde.forEach((id) => marca(id, 'resultado final'))
+        console.log(`  ${st === 'mismatch' ? '✘' : '!'} ${e.ref} (hoja ${donde.join(', ')}): ${st === 'mismatch' ? 'hay un valor parecido pero distinto del esperado; revisa dígitos y signos del resultado' : 'no aparece el resultado esperado; revisa si falta el resultado o está mal leído'}`)
+      }
+    }
+    console.log(`  (coinciden ${estados.found}, distintos ${estados.mismatch}, no encontrados ${estados['not-found']}, sin verificar ${estados.unverifiable}; un resultado distinto puede ser error del alumno: la foto manda)`)
     console.log('\n── Figuras y flechas ──')
     for (const l of lista) {
       const hay = (l.texto.match(/```grafica/g) ?? []).length

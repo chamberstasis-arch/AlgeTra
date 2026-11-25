@@ -14,6 +14,12 @@ a + 3b + 6c + 10d &= 20 \\
 a + 4b + 10c + 20d &= 35
 \end{aligned}$$
 
+**Respuesta:** a = 1, b = 1, c = 1, d = 1
+$$1$$
+$$1$$
+$$1$$
+$$1$$
+
 ## Ejercicio 2
 
 Resolver por eliminación Gauss-Jordan el siguiente sistema de ecuaciones lineales:
@@ -23,3 +29,5 @@ $$\begin{aligned}
 3x + 2y + z &= -1 \\
 2x - y + 4z &= 5
 \end{aligned}$$
+
+**Respuesta:** Sin solución (sistema inconsistente)

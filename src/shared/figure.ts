@@ -261,7 +261,7 @@ function svg2D(spec: FigureSpec2D, g: EstiloGrafica): string {
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}" font-size="14">`)
   out.push(
     `<defs><clipPath id="v"><rect x="${M - 4}" y="${M - 4}" width="${W - 2 * M + 8}" height="${H - 2 * M + 8}"/></clipPath>` +
-      `<marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#222"/></marker>` +
+      `<marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#222"/></marker>` +
       PALETTE.map((c, i) => `<marker id="m${i}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${c}"/></marker>`).join('') +
       '</defs>',
   )
@@ -488,7 +488,7 @@ function svg3D(spec: FigureSpec3D, g: EstiloGrafica): string {
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}" font-size="14">`)
   out.push(
     `<defs><clipPath id="v"><rect x="${M - 4}" y="${M - 4}" width="${W - 2 * M + 8}" height="${H - 2 * M + 8}"/></clipPath>` +
-      `<marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#222"/></marker>` +
+      `<marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#222"/></marker>` +
       PALETTE.map((c, i) => `<marker id="m${i}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${c}"/></marker>`).join('') +
       '</defs>',
   )

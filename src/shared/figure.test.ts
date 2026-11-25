@@ -106,3 +106,15 @@ describe('bloque grafica en el parser MMD', () => {
     expect(b.map((x) => x.t)).toEqual(['para', 'figure', 'para'])
   })
 })
+
+describe('flechas de los ejes', () => {
+  it('el marcador de los ejes sigue la dirección de la línea (el eje y apunta hacia arriba, no hacia la derecha)', () => {
+    for (const src of ['{"tipo":"cartesiana","escala":"leida","x":[0,5],"y":[0,5],"elementos":[{"t":"punto","en":[1,1]}]}', '{"tipo":"r3","escala":"leida","elementos":[{"t":"punto","en":[1,1,1]}]}']) {
+      const r = parseFigure(src)
+      if (!r.ok) throw new Error(r.error)
+      const svg = figureSvg(r.spec)
+      expect(svg).toMatch(/<marker id="ax"[^>]*orient="auto"/)
+      expect(svg).not.toContain('auto-start-reverse')
+    }
+  })
+})

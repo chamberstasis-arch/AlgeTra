@@ -49,7 +49,7 @@ export function parseActivity(src: string, file: string): Activity {
     const ref = `${id}/${number}`
     if (!statement) warnings.push(`${ref}: sin enunciado.`)
     if (!split) warnings.push(`${ref}: sin "**Respuesta:**"; no se podrá verificar la respuesta final.`)
-    else if (!answers.length) warnings.push(`${ref}: la respuesta no contiene fórmulas ($…$ o $$…$$).`)
+    else if (!answers.length && !answerText) warnings.push(`${ref}: la respuesta está vacía.`)
     for (const a of answers) {
       const r = evaluateLatex(a)
       if (!r.ok) warnings.push(`${ref}: la respuesta "${a.slice(0, 40)}" no es evaluable (${r.reason}); se mostrará pero no se verificará automáticamente.`)

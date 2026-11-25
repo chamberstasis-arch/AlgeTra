@@ -56,3 +56,11 @@ describe('contraste de figuras', () => {
     expect(contrastarFiguras(fig('{"t":"vector","de":[1,1],"a":[1,1],"etiqueta":"(1,1)"}')).join(' ')).toMatch(/longitud cero/)
   })
 })
+
+import { estructuraIntercalada } from './contraste'
+describe('estructura intercalada', () => {
+  it('una progresión de 3 pasos en un renglón es normal; 4 o más bloques se señalan', () => {
+    expect(estructuraIntercalada('$$2x-y=3 \\qquad -y=3-2x \\qquad y=-3+2x$$')).toEqual([])
+    expect(estructuraIntercalada('$$a=1 \\qquad b=2 \\qquad c=3 \\qquad d=4$$')).toHaveLength(1)
+  })
+})

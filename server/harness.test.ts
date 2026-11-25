@@ -130,7 +130,7 @@ describe('título de actividad y encabezado de la hoja', () => {
   })
 })
 
-import { revisarFormato } from './harness'
+import { revisarFormato, separarEnunciado } from './harness'
 describe('revisión de formato del documento', () => {
   it('detecta lo que hay que limpiar', () => {
     const body = ['Sobra al inicio', '', '# Actividad 1', 'Resolver el sistema', 'Resolver el sistema', '$$x+1=$$', '', '# Actividad 3', '', '# Actividad 4', '[Gráfica 3D: v]'].join('\n')
@@ -148,5 +148,40 @@ describe('revisión de formato del documento', () => {
   it('los encabezados # en la transcripción impiden cerrar', () => {
     const l = lintTranscription(parseMarkers('# Actividad 5\nHola $a$'), null, [])
     expect(l.errors.join(' ')).toMatch(/encabezados/)
+  })
+})
+
+describe('enunciado justo antes de la marca', () => {
+  it('el enunciado que precede a la marca de ejercicio se queda con ese ejercicio y no con el anterior', () => {
+    const t = '$$a=1$$\nResolver por eliminación Gauss-Jordan el siguiente sistema:\n<!-- ejercicio: act-15/1 -->\n$$b=2$$'
+    const segs = orderSegments(splitSegments(t, 1))
+    expect(segs.map((x) => [x.act, x.text.trim()])).toEqual([['act-15', '$$a=1$$'], ['act-15', 'Resolver por eliminación Gauss-Jordan el siguiente sistema:\n$$b=2$$']])
+  })
+  it('no mueve renglones que no parecen enunciado', () => {
+    const [resto, enun] = separarEnunciado('$$a=1$$\nPor lo tanto x vale 3')
+    expect(enun).toBe('')
+    expect(resto).toContain('Por lo tanto')
+  })
+  it('las sumas auxiliares ```aux no llegan al cuerpo ni a las verificaciones', () => {
+    const m = parseMarkers('Texto\n```aux\n$$\\begin{array}{r}1\\\\ \\hline 2\\end{array}$$\n```\n$$x=1$$')
+    expect(m.body).not.toContain('array')
+    expect(m.body).toContain('x=1')
+  })
+})
+
+import { depurarTexto, normalizarUnitarios } from './harness'
+describe('depuración', () => {
+  it('los vectores unitarios van en negrita recta solo dentro de fórmulas', () => {
+    expect(normalizarUnitarios('Sea $u = 2i - 3j + k$ y el vector i del texto')).toBe('Sea $u = 2\\mathbf{i} - 3\\mathbf{j} + \\mathbf{k}$ y el vector i del texto')
+    expect(normalizarUnitarios('$$\\frac{2}{\\sqrt{13}}i+\\frac{3}{\\sqrt{13}}j$$')).toBe('$$\\frac{2}{\\sqrt{13}}\\mathbf{i}+\\frac{3}{\\sqrt{13}}\\mathbf{j}$$')
+  })
+  it('no toca índices ni palabras ni nombres de comandos', () => {
+    const t = '$$a_{ij}+R_i \\to \\text{si j}+\\sin x$$'
+    expect(normalizarUnitarios(t)).toBe(t)
+  })
+  it('las sumas a dos pisos pasan a un bloque aux; las matrices aumentadas no', () => {
+    const suma = '$$\\begin{array}{rr} & 2 \\\\ - & 4 \\\\ \\hline & 0 \\end{array}$$'
+    const aug = '$$\\left[\\begin{array}{cc|c}1&2&3\\\\4&5&6\\end{array}\\right]$$'
+    expect(depurarTexto(`${suma}\n${aug}`, { unitarios: false })).toBe(`\`\`\`aux\n${suma}\n\`\`\`\n${aug}`)
   })
 })

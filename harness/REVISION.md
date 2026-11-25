@@ -12,6 +12,12 @@ Objetivo: dejar las hojas ya transcritas apegadas a lo que de verdad dice la fot
 - **Método con sentido**: el procedimiento transcrito debe ser el que pide el enunciado (proyección: `\frac{u\cdot v}{|v|^2}v`; Gauss-Jordan: operaciones entre renglones hasta la identidad; producto cruz: determinante con i, j, k; inversa: [A|I]; etc.). Si lo transcrito no se parece al método, probablemente un símbolo está mal leído.
 - **Figuras y flechas** (`pnpm harness figuras <id>` dibuja cada figura como PNG): compara contra la foto, una por una: origen y PUNTA de cada flecha, sentido, a qué cuadrante apunta, longitud relativa, qué vector es cuál (etiqueta), y puntos y rectas. Corrige el JSON del bloque `grafica`. En 3D, comprueba que las coordenadas escritas junto a las puntas son las del bloque. No pongas rótulos "x"/"y" como texto: el motor ya rotula los ejes.
 
+## Comentarios de la persona (`pnpm harness comentarios <entrega|id>`)
+La persona revisa en la interfaz («Revisar con comentarios») renglón por renglón. Cada comentario trae el renglón de `transcripcion.md`. Atiéndelos igual que las observaciones: foto primero, edición mínima. Comentarios típicos: dígito/signo mal leído; falta un paso; el enunciado quedó pegado a otro ejercicio; pasos de dos ejercicios o columnas intercalados (transcribe cada columna completa, con su `<!-- inciso: x -->`); sumas «a dos pisos» (bloque ```aux, fuera del documento); vector unitario mal leído (`i`, `j`, `k`: símbolos, dentro de la fórmula). Al terminar: `pnpm harness atender <id> <n,n|todos> --nota "…"` y `cerrar`.
+
+## Resultado final contra la resolución de referencia
+`contrastar` compara el resultado final de cada ejercicio con una resolución hecha con los mismos métodos del curso. No te dice el valor esperado, solo «distinto» o «no aparece»: vuelve a la foto en esa zona. Si la foto confirma lo escrito, es error del alumno y se queda.
+
 ## Procedimiento por hoja (máximo 4 por encargo)
 1. `pnpm harness reabrir <id>` (la hoja pasa a en_proceso).
 2. Mira la foto en lo marcado; edita `transcripcion.md` solo donde corresponda (edición mínima, no reescribas la hoja).

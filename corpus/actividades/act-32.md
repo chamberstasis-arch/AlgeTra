@@ -8,3 +8,5 @@ tema: transformaciones-geometricas-3d
 
 Realizar las siguientes transformaciones geométricas tridimensionales consecutivas sobre la figura formada por los puntos $P_{1}(2, 2, 1)$, $P_{2}(-2, 2, 1)$, $P_{3}(-2, -2, 1)$, $P_{4}(2, -2, 1)$ y $P_{5}(0, 0, -4)$, y graficar los resultados (conexión entre puntos / aristas: $(P_{1}, P_{2}), (P_{1}, P_{4}), (P_{2}, P_{3}), (P_{3}, P_{4}), (P_{5}, P_{1}), (P_{5}, P_{2}), (P_{5}, P_{3}), (P_{5}, P_{4})$):
 a) Rotar en $\theta = 90^{\circ}$ respecto al eje $x$   b) Rotar en $\theta = 45^{\circ}$ respecto al eje $y$   c) Escalar en $S = (2, 2, 2)$
+
+**Respuesta:** Puntos finales: P_{1}'=(5.6569, -2, 0)\quad P_{2}'=(0, -2, 5.6569)\quad P_{3}'=(-5.6569, -2, 0)\quad P_{4}'=(0, -2, -5.6569)\quad P_{5}'=(0, 8, 0) (rotación sobre x: y′ = y cosθ − z senθ, z′ = y senθ + z cosθ; sobre y: x′ = x cosθ + z senθ, z′ = −x senθ + z cosθ).

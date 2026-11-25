@@ -13,6 +13,8 @@ $$\begin{bmatrix}
 1 & -1 & 2 & 3
 \end{bmatrix}$$
 
+**Respuesta:** Rango 3; la forma escalonada no es única, se compara por el rango y por la forma reducida.
+
 ## Ejercicio 2
 
 Reducir la matriz asociada al sistema en forma escalonada:
@@ -21,6 +23,8 @@ $$\begin{aligned}
 6x - 8y + 5z &= -1 \\
 12x + 12y - 15z &= 10
 \end{aligned}$$
+
+**Respuesta:** Rango 3; la forma escalonada no es única, se compara por el rango y por la forma reducida.
 
 ## Ejercicio 3
 
@@ -31,6 +35,8 @@ $$\begin{aligned}
 10x - y + z &= 10
 \end{aligned}$$
 
+**Respuesta:** Rango 3; la forma escalonada no es única, se compara por el rango y por la forma reducida.
+
 ## Ejercicio 4
 
 Reducir la matriz asociada al sistema en forma escalonada:
@@ -40,3 +46,5 @@ x + y + 2z - 5w &= 3 \\
 2x + y - z + 3w &= -11 \\
 x - 3y + 2z + 7w &= -5
 \end{aligned}$$
+
+**Respuesta:** Rango 3; la forma escalonada no es única, se compara por el rango y por la forma reducida.

@@ -204,3 +204,13 @@ Con la entrega transcrita, `pnpm harness contrastar <entrega>` produce una lista
 - Salida final «Hojas a revisar» (en la entrega real: 21 de 62, no las 62).
 
 El enunciado solo indica dónde mirar: la corrección sale de la foto (`harness/REVISION.md`), salvo los datos copiados del enunciado cuando la foto es ambigua. El corpus no trae respuestas esperadas, así que no se puede verificar el resultado final contra una solución. Prompt «contraste» en la UI: orquestador que reparte las hojas entre subagentes `revisor` (`.opencode/agents/revisor.md`, `.qwen/agents/revisor.md`).
+
+## Resolución de referencia, depuración y revisión con comentarios
+
+- **Resolución de referencia** (`server/resolver.ts`, `pnpm harness resolver --escribir`): resuelve los 152 ejercicios con aritmética exacta y los métodos del curso (Gauss-Jordan, determinantes por eliminación, inversa por [A|I], proyección `u·v/|v|² v`, producto cruz por determinante, cosenos directores, transformaciones). Escribe `**Respuesta:**` en `corpus/actividades/` y el procedimiento en `corpus/soluciones/`. Quien transcribe no las ve; `contrastar` solo dice «distinto» o «no aparece».
+- **`pnpm harness contrastar <entrega>`** ahora incluye «Resultado final» (contra la referencia) y «Estructura» (≥4 bloques `\qquad` en un renglón).
+- **`pnpm harness depurar <entrega> [--aplicar]`**: sumas «a dos pisos» → bloque ```` ```aux ```` (se conserva, no entra al documento ni a las verificaciones) y vectores unitarios `i, j, k` → `\mathbf{}` en las actividades de vectores. Guarda `transcripcion.antes-de-depurar.md`.
+- **Enunciado pegado**: hasta 3 renglones de enunciado justo antes de una marca `<!-- ejercicio -->` se mueven al ejercicio que sigue (`separarEnunciado`).
+- **Revisión con comentarios**: pestaña «Revisar con comentarios» (foto + renglones numerados; clic en un renglón para comentarlo) → `comentarios.json` por hoja. `pnpm harness comentarios <entrega|id>` lista los pendientes; `pnpm harness atender <id> <n|todos>` los marca. Prompt: «Prompt: comentarios» (`harness/PROMPT_COMENTARIOS.md`).
+- **Tablas**: en el DOCX se compactan (ancho según contenido, letra al 80 %, sin espaciado).
+- **Figuras**: la punta de los ejes ahora sigue la dirección de la línea (el eje y apunta hacia arriba). Las figuras 3D se dibujan siempre (`RAPIDO.md`).

@@ -77,6 +77,18 @@
   .view img { max-width:100%; display:block; margin:0 auto; }
   .view iframe { width:100%; height:78vh; border:0; }
   .pad { padding:16px; }
+  .rev { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:14px; align-items:start; }
+  .rev .foto { position:sticky; top:8px; max-height:82vh; overflow:auto; border:1px solid var(--line); border-radius:9px; }
+  .rev .foto img { width:100%; display:block; }
+  .rev .lineas { max-height:82vh; overflow:auto; border:1px solid var(--line); border-radius:9px; }
+  .rl { display:grid; grid-template-columns:34px 1fr; gap:6px; padding:4px 8px; border-bottom:1px solid #f0f1f4; }
+  .rl .n { color:var(--mut,#888); font:11px ui-monospace,monospace; text-align:right; padding-top:3px; }
+  .rl .t { font:12.5px/1.45 ui-monospace,Consolas,monospace; white-space:pre-wrap; word-break:break-word; cursor:pointer; }
+  .rl.nota .t { color:#9aa; }
+  .rl.tiene { background:#fff8e6; }
+  .rl.hecho { background:#eef8ee; }
+  .rl .c { grid-column:2; width:100%; font:13px/1.4 system-ui,sans-serif; padding:5px 7px; border:1px solid var(--line); border-radius:6px; resize:vertical; min-height:30px; }
+  .rl .r { grid-column:2; font-size:12px; color:#2b7a3d; }
   textarea.ed { width:100%; height:58vh; font:13px/1.55 ui-monospace, Consolas, monospace; padding:12px; border:1px solid var(--line); border-radius:9px; resize:vertical; }
   .lint-e { color:var(--bad); } .lint-w { color:#9a6b0a; }
   .note { font-size:13px; color:var(--mut); margin:10px 0 0; }
@@ -100,6 +112,7 @@
   <button class="ghost" id="btnPrompt" title="Una hoja y se detiene">Prompt: una hoja</button>
   <button class="ghost" id="btnLote" title="Hasta 5 hojas seguidas y reporta una tabla">Prompt: lote</button>
   <button class="ghost" id="btnOrq" title="Un solo agente que reparte hojas a 4 subagentes en paralelo">Prompt: orquestador</button>
+  <button class="ghost" id="btnCom" title="Atiende los comentarios que dejaste al revisar hojas renglón por renglón">Prompt: comentarios</button>
   <button class="ghost" id="btnCon" title="Revisión contra el enunciado: matrices, operaciones, figuras y flechas">Prompt: contraste</button>
 </header>
 <main>
@@ -286,6 +299,7 @@ function pintarHoja() {
   const cerrada = view.estado === 'procesadas' || view.estado === 'revision'
   const tabs = [['foto', 'Foto']]
   if (view.estado !== 'por_procesar') tabs.push(['mejorada', 'Mejorada'], ['texto', cerrada ? 'Editar transcripción' : 'Transcripción'])
+  if (cerrada) tabs.push(['revision', 'Revisar con comentarios'])
   if (cerrada) tabs.unshift(['documento', 'Documento'])
   if (!tabs.find((t) => t[0] === view.tab)) view.tab = tabs[0][0]
   $('#hTabs').innerHTML = tabs.map(([k, l]) => `<button data-t="${k}" class="${k === view.tab ? 'on' : ''}">${l}</button>`).join('')
@@ -293,8 +307,43 @@ function pintarHoja() {
   const v = $('#hCuerpo'), u = (tipo) => `/api/archivo?${q({ estado: view.estado, id: view.id, tipo })}&t=${Date.now()}`
   if (view.tab === 'foto' || view.tab === 'mejorada') v.innerHTML = `<div class="view"><img src="${u(view.tab === 'foto' ? 'imagen' : 'mejorada')}" alt=""></div>`
   else if (view.tab === 'documento') { v.innerHTML = `<div class="view"><div class="pad muted">Generando vista…</div></div>`; const f = document.createElement('iframe'); f.src = u('pdf'); f.onload = () => v.querySelector('.pad')?.remove(); v.firstChild.appendChild(f) }
+  else if (view.tab === 'revision') pintarRevision(v)
   else if (cerrada) pintarEditor(v)
   else fetch(u('md')).then((r) => r.ok ? r.text() : '').then((t) => { v.innerHTML = `<div class="view"><div class="pad" style="white-space:pre-wrap;font:13px/1.55 ui-monospace,Consolas,monospace">${esc(t) || '<span class="muted">Aún no hay transcripción.</span>'}</div></div>` })
+}
+
+async function pintarRevision(v) {
+  const h = { estado: view.estado, id: view.id }
+  v.innerHTML = '<div class="pad muted">Cargando…</div>'
+  const [texto, previos] = await Promise.all([
+    fetch(`/api/archivo?${q({ ...h, tipo: 'md' })}&t=${Date.now()}`).then((r) => r.text()),
+    fetch(`/api/comentarios?${q(h)}`).then((r) => r.json()),
+  ])
+  const lineas = texto.split('\n')
+  const porLinea = new Map(); previos.forEach((c) => { const k = c.contexto && lineas[c.linea - 1]?.trim() !== c.contexto.trim() ? (lineas.findIndex((l) => l.trim() === c.contexto.trim()) + 1 || c.linea) : c.linea; porLinea.set(k, c) })
+  const foto = `/api/archivo?${q({ ...h, tipo: 'imagen' })}`
+  v.innerHTML = `<div class="rev"><div class="foto"><img src="${foto}" alt=""></div><div class="lineas" id="rvL"></div></div>
+    <div class="foot"><button class="primary" id="rvSave">Guardar comentarios</button><span class="note" style="margin-left:10px">Haz clic en un renglón para comentarlo (dígito mal leído, estructura, falta algo…). Después pídele al agente: <code>pnpm harness comentarios ${esc(h.id.split('__')[0])}</code>.</span></div><div class="msg" id="rvMsg"></div>`
+  const cont = $('#rvL')
+  lineas.forEach((l, i) => {
+    if (!l.trim()) return
+    const c = porLinea.get(i + 1)
+    const d = document.createElement('div')
+    d.className = 'rl' + (l.trim().startsWith('<!--') ? ' nota' : '') + (c ? (c.estado === 'resuelto' ? ' hecho' : ' tiene') : '')
+    d.dataset.l = i + 1; d.dataset.ctx = l.trim(); if (c) d.dataset.cid = c.id
+    d.innerHTML = `<span class="n">${i + 1}</span><span class="t">${esc(l)}</span>`
+    const poner = (val) => { const ta = document.createElement('textarea'); ta.className = 'c'; ta.placeholder = 'Comentario'; ta.value = val || ''; d.appendChild(ta); ta.focus() }
+    if (c) { poner(c.texto); if (c.estado === 'resuelto') { const r = document.createElement('div'); r.className = 'r'; r.textContent = '✓ atendido' + (c.respuesta ? ': ' + c.respuesta : ''); d.appendChild(r) } }
+    d.querySelector('.t').onclick = () => { if (!d.querySelector('.c')) poner('') }
+    cont.appendChild(d)
+  })
+  $('#rvSave').onclick = async () => {
+    const comentarios = [...cont.querySelectorAll('.rl')].map((d) => ({ id: d.dataset.cid ? Number(d.dataset.cid) : undefined, linea: Number(d.dataset.l), contexto: d.dataset.ctx, texto: d.querySelector('.c')?.value || '' })).filter((c) => c.texto.trim())
+    const r = await fetch('/api/comentarios', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...h, comentarios }) })
+    const j = await r.json()
+    $('#rvMsg').textContent = r.ok ? `Guardados ${j.total} comentario(s); ${j.pendientes} pendiente(s) para el agente.` : (j.message || 'No se pudo guardar')
+    if (r.ok) pintarRevision(v)
+  }
 }
 
 async function pintarEditor(v) {
@@ -431,7 +480,7 @@ inp.onchange = () => { upload([...inp.files]); inp.value = '' }
 ;['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
 drop.addEventListener('drop', (e) => upload([...e.dataTransfer.files]))
 
-for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador'], ['#btnCon', 'contraste', 'Prompt: contraste']]) {
+for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador'], ['#btnCon', 'contraste', 'Prompt: contraste'], ['#btnCom', 'comentarios', 'Prompt: comentarios']]) {
   $(id).onclick = async () => {
     const t = await (await fetch('/api/prompt' + (tipo ? '?tipo=' + tipo : ''))).text()
     try { await navigator.clipboard.writeText(t); $(id).textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }
