@@ -81,12 +81,11 @@ export function lintTranscription(m: Markers, checks: ChecksResponse | null, fai
 
   if (checks) {
     const bad = checks.consistency.checks.filter((c) => c.status === 'inconsistent')
+    // Un renglón que no cuadra no bloquea el cierre (cuesta una vuelta más a la imagen y casi siempre es error del alumno):
+    // se avisa y la hoja va a revisión para que la persona decida.
     for (const c of bad) {
       const cells = (c.cells ?? []).map((x) => `celda (${x.row},${x.col}): escrito ${x.right}, esperado ${x.left}`).join('; ')
-      errors.push(
-        `La aritmética no cuadra en  ${c.latex}  →  ${c.detail.replace(/\.$/, '')}${cells ? ` [${cells}]` : ''}. ` +
-          'Vuelve a mirar la imagen en esa celda: o es un dígito mal leído, o el error es del alumno (se transcribe tal cual).',
-      )
+      needsReview.push(`La aritmética no cuadra en  ${c.latex}  →  ${c.detail.replace(/\.$/, '')}${cells ? ` [${cells}]` : ''}. Puede ser un error del alumno o un dígito mal leído.`)
     }
     info.push(`Aritmética: ${checks.consistency.verified} verificada(s), ${checks.consistency.inconsistent} inconsistente(s), ${checks.consistency.unverifiable} no verificable(s).`)
     for (const e of checks.exercises)

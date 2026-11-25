@@ -20,11 +20,12 @@ describe('dollarBalance', () => {
 
 describe('lintTranscription', () => {
   const body = '$$A+B=\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}+\\begin{pmatrix}5&6\\\\7&8\\end{pmatrix}=\\begin{pmatrix}6&8\\\\10&13\\end{pmatrix}$$'
-  it('marca la celda aritmética incorrecta como error', () => {
+  it('avisa (sin bloquear) la celda aritmética incorrecta', () => {
     const m = parseMarkers(body)
     const l = lintTranscription(m, runChecks(m.body, []), [])
-    expect(l.errors.join(' ')).toMatch(/aritmética no cuadra/)
-    expect(l.errors.join(' ')).toMatch(/celda \(2,2\)/)
+    expect(l.errors).toEqual([])
+    expect(l.needsReview.join(' ')).toMatch(/aritmética no cuadra/)
+    expect(l.needsReview.join(' ')).toMatch(/celda \(2,2\)/)
   })
   it('[?], dudas y gráficas obligan a revisión pero no impiden cerrar', () => {
     const m = parseMarkers('Texto [?]\n[Gráfica: recta]\n<!-- DUDA: x -->')

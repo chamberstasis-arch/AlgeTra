@@ -168,3 +168,14 @@ Una sola acción principal (soltar un ZIP o fotos). Las entregas son una lista c
 - `.qwen/agents/transcriptor.md`: subagente que procesa hasta 3 hojas con contexto limpio y devuelve una tabla de ≤8 líneas.
 - `harness/PROMPT_ORQUESTADOR.md` (botón «Prompt: orquestador» en la UI): una sola sesión lanza 3 subagentes en paralelo por ronda, máximo 3 rondas (≈27 hojas), y reporta una tabla unida.
 - No verificado con Qwen Code real: que respete el paralelismo y que `.qwen/agents/` se descubra en el proyecto (la documentación no indica límite de concurrencia).
+
+## Modo rápido (menos costo y tiempo)
+
+El primer lote real costó más de lo estimado (≈2 min y mucho contexto por hoja). Se recortó el flujo, aceptando algo menos de precisión:
+
+- `harness/RAPIDO.md` (≈2 KB) sustituye a `INSTRUCCIONES.md` (12 KB) para los agentes; el manual largo queda como referencia.
+- Una sola pasada: sin segunda lectura de la imagen, sin `validar` aparte (`cerrar` ya valida), sin comentarios de tachados ni notas.
+- La actividad sale del número del encabezado de la hoja; ya no se consulta la base de enunciados.
+- Una aritmética que no cuadra ya no bloquea el cierre: manda la hoja a revisión con la celda señalada (antes obligaba a volver a mirar la imagen y cerrar con `--revisado`).
+- Figuras 3D e isométricas: una línea `[Gráfica 3D: …]` en vez de un bloque JSON; la persona las revisa.
+- Subagentes de 4 hojas y 4 en paralelo (`.qwen/agents/` y `.opencode/agents/`); el orquestador no relee manuales ni tablas.
