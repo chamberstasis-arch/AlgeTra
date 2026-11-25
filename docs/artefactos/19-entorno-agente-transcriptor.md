@@ -179,3 +179,17 @@ El primer lote real costó más de lo estimado (≈2 min y mucho contexto por ho
 - Una aritmética que no cuadra ya no bloquea el cierre: manda la hoja a revisión con la celda señalada (antes obligaba a volver a mirar la imagen y cerrar con `--revisado`).
 - Figuras 3D e isométricas: una línea `[Gráfica 3D: …]` en vez de un bloque JSON; la persona las revisa.
 - Subagentes de 4 hojas y 4 en paralelo (`.qwen/agents/` y `.opencode/agents/`); el orquestador no relee manuales ni tablas.
+
+## Limpieza de formato del documento ensamblado
+
+Se revisó el DOCX ensamblado de la entrega real (82 páginas) y se corrigió:
+
+- Tablas de barras (`| x | y |`) salían como texto con barras: ahora son tablas de Word.
+- Los espacios de `\qquad`/`\quad` entre pasos de un mismo renglón se perdían ("x−y=2|−2|−2x…"): ahora van como texto normal dentro de la fórmula.
+- Una ecuación que termina en "=" (el alumno no puso resultado) dibujaba un "¿" rojo: se rellena con un espacio.
+- Orden: por actividad (1, 2, 3…) respetando el orden del cuaderno dentro de cada una; antes se ordenaba por ejercicio entre hojas y se intercalaban ejercicios repetidos. Una marca solo de inciso hereda la actividad, y el enunciado que abre la primera hoja se queda con la primera actividad (antes quedaban al inicio, sin título).
+- `#` en la transcripción impide cerrar (el título lo pone el sistema).
+- `pnpm harness formato <entrega>`: revisión de texto del ensamblado (renglones sin título, actividades faltantes/vacías/repetidas, renglones duplicados, ecuaciones sin resultado, figuras solo descritas).
+- Los agentes hacen antes de cerrar una revisión de formato de su propio texto (sin volver a la imagen); `cerrar <id> --siguiente` cierra y entrega la hoja siguiente en la misma respuesta (menos vueltas por hoja).
+
+Nota: la vista previa PDF usa LibreOffice; la fidelidad final de las ecuaciones debe confirmarse abriendo el DOCX en Word.

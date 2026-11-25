@@ -47,10 +47,33 @@ export function parseInline(text: string): Inline[] {
   return out
 }
 
+/** Tabla de barras (`| a | b |` con renglón `|---|---|`): se convierte en tabla de Word. */
+function parsePipeTable(lines: string[]): Inline[][][] {
+  const rows: Inline[][][] = []
+  for (const l of lines) {
+    const t = l.trim()
+    if (/^\|?[\s:|-]*-[\s:|-]*\|?$/.test(t)) continue // renglón separador
+    const cells = t.replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/)
+    rows.push(cells.map((c) => parseInline(c.trim())))
+  }
+  return rows
+}
+
 function parseTextChunk(chunk: string, blocks: Block[]) {
-  for (const raw of chunk.split('\n')) {
+  const all = chunk.split('\n')
+  for (let i = 0; i < all.length; i++) {
+    const raw = all[i]
     const line = raw.trim()
     if (!line) continue
+    if (/^\|.*\|$/.test(line) && !line.includes('$$')) {
+      const grupo = [line]
+      while (i + 1 < all.length && /^\|.*\|$/.test(all[i + 1].trim())) grupo.push(all[++i].trim())
+      const rows = parsePipeTable(grupo)
+      if (rows.length) {
+        blocks.push({ t: 'table', rows })
+        continue
+      }
+    }
     const h = /^(#{1,6})\s+(.*)$/.exec(line)
     const body = h ? h[2] : line
     const inlines = parseInline(body)

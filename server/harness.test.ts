@@ -53,10 +53,21 @@ describe('ensamblado por ejercicio e inciso', () => {
   const pagina2 = 'continuación sin marca\n<!-- ejercicio: act-03/10 -->\nEj 10\n<!-- ejercicio: act-03/1 -->\nEj 1'
   const segs = [...splitSegments(pagina1, 1), ...splitSegments(pagina2, 2)]
 
-  it('ordena por ejercicio (numérico) e inciso y deja la continuación con su ejercicio', () => {
+  it('dentro de una actividad respeta el orden del cuaderno (no intercala ejercicios repetidos entre hojas)', () => {
     const t = orderSegments(segs).map((s) => s.text.trim())
-    // La continuación sin marca sigue a lo último escrito antes de ella (el inciso a de la hoja 1).
-    expect(t).toEqual(['Ej 1', 'Ej 2 texto', 'Inciso a', 'continuación sin marca', 'Inciso b', 'Ej 10'])
+    expect(t).toEqual(['Ej 2 texto', 'Inciso b', 'Inciso a', 'continuación sin marca', 'Ej 10', 'Ej 1'])
+  })
+  it('ordena por actividad numérica y una marca solo de inciso hereda la actividad', () => {
+    const t = orderSegments([
+      ...splitSegments('<!-- ejercicio: act-10/1 -->\nDiez', 1),
+      ...splitSegments('<!-- ejercicio: act-2/1 -->\nDos', 2),
+      ...splitSegments('<!-- inciso: c -->\nDos c', 3),
+    ])
+    expect(t.map((s) => `${s.act}:${s.text.trim()}`)).toEqual(['act-2:Dos', 'act-2:Dos c', 'act-10:Diez'])
+  })
+  it('el enunciado que abre la primera hoja antes de su primera marca se queda con la primera actividad', () => {
+    const t = orderSegments(splitSegments('Enunciado inicial\n<!-- ejercicio: act-01/1 -->\nUno', 1))
+    expect(t.map((s) => s.act)).toEqual(['act-01', 'act-01'])
   })
   it('respeta el orden original si se pide', () => {
     const t = orderSegments(segs, true).map((s) => s.text.trim())
@@ -116,5 +127,26 @@ describe('título de actividad y encabezado de la hoja', () => {
   })
   it('lo que no tiene actividad va sin título', () => {
     expect(componerCuerpo(orderSegments(splitSegments('Texto huérfano', 1)))).toBe('Texto huérfano')
+  })
+})
+
+import { revisarFormato } from './harness'
+describe('revisión de formato del documento', () => {
+  it('detecta lo que hay que limpiar', () => {
+    const body = ['Sobra al inicio', '', '# Actividad 1', 'Resolver el sistema', 'Resolver el sistema', '$$x+1=$$', '', '# Actividad 3', '', '# Actividad 4', '[Gráfica 3D: v]'].join('\n')
+    const p = revisarFormato(body).join('\n')
+    expect(p).toMatch(/antes de la primera actividad/)
+    expect(p).toMatch(/Faltan las actividades: 2/)
+    expect(p).toMatch(/Actividad 3 está vacía/)
+    expect(p).toMatch(/Renglón duplicado/)
+    expect(p).toMatch(/1 ecuación\(es\) terminan/)
+    expect(p).toMatch(/1 figura/)
+  })
+  it('un documento limpio no devuelve observaciones', () => {
+    expect(revisarFormato('# Actividad 1\n\nTexto\n\n# Actividad 2\n\n$$a=b$$')).toEqual([])
+  })
+  it('los encabezados # en la transcripción impiden cerrar', () => {
+    const l = lintTranscription(parseMarkers('# Actividad 5\nHola $a$'), null, [])
+    expect(l.errors.join(' ')).toMatch(/encabezados/)
   })
 })

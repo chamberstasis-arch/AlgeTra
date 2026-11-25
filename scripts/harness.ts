@@ -1,5 +1,5 @@
 // Herramientas locales del agente de transcripción. No llaman a ningún servicio externo.
-// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|medir|aprender> [...]
+// Uso: pnpm harness <estado|siguiente|actividades|validar|cerrar|reabrir|aprobar|ensamblar|formato|medir|aprender> [...]
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
@@ -8,7 +8,7 @@ import { runChecks } from '../server/checks'
 import { findExercises, loadCorpus } from '../server/corpus'
 import { buildDocx } from '../server/docx'
 import { extraerFormato } from '../server/formato'
-import { isArithmeticError, lintTranscription, parseMarkers, safeId } from '../server/harness'
+import { isArithmeticError, lintTranscription, revisarFormato, parseMarkers, safeId } from '../server/harness'
 import { PRESETS, variarEstilo } from '../src/shared/estilo'
 import { D, ROOT, GUIA_CALIDAD, conLock, agruparSueltas, analyzeImage, aprobarHoja, docxHoja, enhanceImage, ensamblar, ensamblarSiCompleta, ensureDirs, ingest, guardarEstilo, leerEstilo, listHojas, ls, natural, normalizarOrientacion, regenerarEntrega } from '../server/workspace'
 
@@ -53,6 +53,61 @@ function printLint(l: Awaited<ReturnType<typeof validate>>['lint'], doubts: stri
   console.log('\n' + l.info.map((i) => `  · ${i}`).join('\n'))
 }
 
+/** Toma la siguiente hoja (exclusiva para este agente) y muestra lo que necesita para transcribirla. */
+async function tomarSiguiente(desdeCerrar = false): Promise<void> {
+  // Varios agentes pueden pedir hoja a la vez: elegir y mover la hoja ocurre bajo un candado, así que nunca
+  // dos agentes reciben la misma. El trabajo pesado (calidad, copia mejorada) va fuera del candado.
+  const tomada = await conLock(async () => {
+    let hojas = await listHojas()
+    let pend = hojas.filter((h) => h.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
+    if (!pend.length) return null
+    let aviso = ''
+    if (!pend[0].entrega) {
+      // Fotos sueltas: sin entrega no habría documento final. Se agrupan solas en una entrega con la fecha de hoy.
+      const d = new Date()
+      const nombre = `entrega-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+      const g = await agruparSueltas(nombre)
+      aviso = `Las hojas no tenían entrega: se agruparon (${g.movidas}) en la entrega "${g.entrega}" para obtener un solo documento al final.`
+      hojas = await listHojas()
+      pend = hojas.filter((x) => x.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
+    }
+    const h = pend[0]
+    const stem = safeId(h.archivo)
+    let id = h.entrega ? `${safeId(h.entrega)}__${stem}` : stem
+    for (let n = 2; hojas.some((x) => x.estado !== 'por_procesar' && x.id === id); n++) id = `${h.entrega ? safeId(h.entrega) + '__' : ''}${stem}-${n}`
+    const orden = hojas.filter((x) => x.entrega === h.entrega && x.estado !== 'por_procesar').length + 1
+    const dir = join(D.en_proceso, id)
+    await mkdir(dir, { recursive: true })
+    const img = join(dir, `imagen${extname(h.archivo).toLowerCase()}`)
+    await rename(h.imagen, img)
+    // La marca de la hoja se escribe ya, dentro del candado: así la siguiente petición cuenta bien el orden.
+    await writeFile(join(dir, 'meta.json'), JSON.stringify({ id, entrega: h.entrega, archivoOriginal: h.archivo, orden, tomadaEn: new Date().toISOString() }, null, 2))
+    return { id, dir, img, orden, entrega: h.entrega, archivo: h.archivo, quedan: pend.length - 1, enOtras: hojas.filter((x) => x.estado === 'en_proceso').length, aviso }
+  })
+  if (!tomada) {
+    if (desdeCerrar) return console.log('No quedan hojas por procesar.')
+    die('No hay imágenes en por_procesar. Trabajo terminado.', 3)
+  }
+  const { id, dir, img, orden, entrega, quedan, enOtras, aviso } = tomada!
+  if (aviso) console.log(aviso)
+  await normalizarOrientacion(img)
+  const calidad = await analyzeImage(img)
+  const mejorada = join(dir, 'imagen_mejorada.jpg')
+  const hasEnh = (await enhanceImage(img, mejorada)) && !!calidad?.banderas.length
+  const meta = await readFile(join(dir, 'meta.json'), 'utf8').then(JSON.parse)
+  await writeFile(join(dir, 'meta.json'), JSON.stringify({ ...meta, calidad }, null, 2))
+  console.log(`Hoja tomada: ${id}${entrega ? `   (entrega "${entrega}", hoja ${orden})` : ''}`)
+  console.log(`Imagen para mirar: ${img}`)
+  if (hasEnh) console.log(`Copia mejorada (contraste/enfoque), mírala también: ${mejorada}`)
+  if (calidad) {
+    console.log(`Calidad: ${calidad.nivel.toUpperCase()}  (${calidad.ancho}×${calidad.alto}, nitidez ${calidad.nitidez}, brillo ${calidad.brillo})`)
+    for (const b of calidad.banderas) console.log(`  ! ${GUIA_CALIDAD[b] ?? b}`)
+  }
+  console.log(`Escribe tu transcripción en: ${join(dir, 'transcripcion.md')}`)
+  console.log(`Quedan ${quedan} por procesar${enOtras ? ` (y hay ${enOtras} en proceso por otros agentes: no las toques)` : ''}.`)
+  console.log(`Cuando termines, ciérrala por su id: pnpm harness cerrar ${id}`)
+}
+
 switch (cmd) {
   case 'estado': {
     const hojas = await listHojas()
@@ -66,54 +121,7 @@ switch (cmd) {
   }
 
   case 'siguiente': {
-    // Varios agentes pueden pedir hoja a la vez: elegir y mover la hoja ocurre bajo un candado, así que nunca
-    // dos agentes reciben la misma. El trabajo pesado (calidad, copia mejorada) va fuera del candado.
-    const tomada = await conLock(async () => {
-      let hojas = await listHojas()
-      let pend = hojas.filter((h) => h.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
-      if (!pend.length) return null
-      let aviso = ''
-      if (!pend[0].entrega) {
-        // Fotos sueltas: sin entrega no habría documento final. Se agrupan solas en una entrega con la fecha de hoy.
-        const d = new Date()
-        const nombre = `entrega-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-        const g = await agruparSueltas(nombre)
-        aviso = `Las hojas no tenían entrega: se agruparon (${g.movidas}) en la entrega "${g.entrega}" para obtener un solo documento al final.`
-        hojas = await listHojas()
-        pend = hojas.filter((x) => x.estado === 'por_procesar').sort((a, b) => natural(a.entrega, b.entrega) || natural(a.archivo, b.archivo))
-      }
-      const h = pend[0]
-      const stem = safeId(h.archivo)
-      let id = h.entrega ? `${safeId(h.entrega)}__${stem}` : stem
-      for (let n = 2; hojas.some((x) => x.estado !== 'por_procesar' && x.id === id); n++) id = `${h.entrega ? safeId(h.entrega) + '__' : ''}${stem}-${n}`
-      const orden = hojas.filter((x) => x.entrega === h.entrega && x.estado !== 'por_procesar').length + 1
-      const dir = join(D.en_proceso, id)
-      await mkdir(dir, { recursive: true })
-      const img = join(dir, `imagen${extname(h.archivo).toLowerCase()}`)
-      await rename(h.imagen, img)
-      // La marca de la hoja se escribe ya, dentro del candado: así la siguiente petición cuenta bien el orden.
-      await writeFile(join(dir, 'meta.json'), JSON.stringify({ id, entrega: h.entrega, archivoOriginal: h.archivo, orden, tomadaEn: new Date().toISOString() }, null, 2))
-      return { id, dir, img, orden, entrega: h.entrega, archivo: h.archivo, quedan: pend.length - 1, enOtras: hojas.filter((x) => x.estado === 'en_proceso').length, aviso }
-    })
-    if (!tomada) die('No hay imágenes en por_procesar. Trabajo terminado.', 3)
-    const { id, dir, img, orden, entrega, quedan, enOtras, aviso } = tomada!
-    if (aviso) console.log(aviso)
-    await normalizarOrientacion(img)
-    const calidad = await analyzeImage(img)
-    const mejorada = join(dir, 'imagen_mejorada.jpg')
-    const hasEnh = (await enhanceImage(img, mejorada)) && !!calidad?.banderas.length
-    const meta = await readFile(join(dir, 'meta.json'), 'utf8').then(JSON.parse)
-    await writeFile(join(dir, 'meta.json'), JSON.stringify({ ...meta, calidad }, null, 2))
-    console.log(`Hoja tomada: ${id}${entrega ? `   (entrega "${entrega}", hoja ${orden})` : ''}`)
-    console.log(`Imagen para mirar: ${img}`)
-    if (hasEnh) console.log(`Copia mejorada (contraste/enfoque), mírala también: ${mejorada}`)
-    if (calidad) {
-      console.log(`Calidad: ${calidad.nivel.toUpperCase()}  (${calidad.ancho}×${calidad.alto}, nitidez ${calidad.nitidez}, brillo ${calidad.brillo})`)
-      for (const b of calidad.banderas) console.log(`  ! ${GUIA_CALIDAD[b] ?? b}`)
-    }
-    console.log(`Escribe tu transcripción en: ${join(dir, 'transcripcion.md')}`)
-    console.log(`Quedan ${quedan} por procesar${enOtras ? ` (y hay ${enOtras} en proceso por otros agentes: no las toques)` : ''}.`)
-    console.log(`Cuando termines, ciérrala por su id: pnpm harness cerrar ${id}`)
+    await tomarSiguiente()
     break
   }
 
@@ -221,6 +229,10 @@ switch (cmd) {
       console.log(`Documento: ${join(D.entregas, safeId(completa.entrega), 'documento.docx')}`)
       for (const x of completa.requierenRevision) console.log(`  ! ${x}`)
     }
+    if (flags.has('--siguiente')) {
+      console.log('\n──────── Siguiente hoja ────────')
+      await tomarSiguiente(true)
+    }
     break
   }
 
@@ -265,6 +277,16 @@ switch (cmd) {
       const r = await regenerarEntrega(entrega)
       console.log(r ? `Documentos regenerados (${r.hojas} hoja(s)); no se volvió a procesar nada.` : 'Estilo guardado. Se aplicará al ensamblar la entrega.')
     }
+    break
+  }
+
+  case 'formato': {
+    // pnpm harness formato <entrega>: revisión de formato del documento ensamblado (solo texto).
+    if (!positional[0]) die('Uso: pnpm harness formato <entrega>', 2)
+    const f = join(D.entregas, safeId(positional[0]), 'ensamblado.md')
+    if (!existsSync(f)) die(`No hay documento ensamblado de "${positional[0]}". Ejecuta: pnpm harness ensamblar ${positional[0]}`)
+    const probs = revisarFormato(await readFile(f, 'utf8'))
+    console.log(probs.length ? probs.map((x) => `  ! ${x}`).join('\n') : 'Formato sin observaciones.')
     break
   }
 

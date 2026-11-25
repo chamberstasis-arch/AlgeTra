@@ -62,6 +62,9 @@ export function lintTranscription(m: Markers, checks: ChecksResponse | null, fai
   if (SELLO_RE.test(m.body) || m.comments.some((c) => SELLO_RE.test(c)))
     errors.push('Se menciona un sello. Los sellos se ignoran por completo: no se transcriben ni se comentan. Quita esa mención (si tapa escritura, habla de "zona ilegible").')
 
+  // El título de cada actividad lo pone el sistema; un encabezado propio duplicaría o descuadraría el documento.
+  if (/^#{1,6}\s/m.test(m.body)) errors.push('No uses encabezados `#`: el sistema pone el título "Actividad N" por su cuenta. Escribe ese texto como renglón normal.')
+
   const bal = dollarBalance(m.body)
   if (bal.display % 2) errors.push('Hay un `$$` sin cerrar.')
   if (bal.inline % 2) errors.push('Hay un `$` sin cerrar.')
@@ -153,17 +156,26 @@ export function splitSegments(source: string, page: number): Segment[] {
 const nat = (a: string, b: string) => a.localeCompare(b, 'es', { numeric: true })
 
 /**
- * Ordena por actividad → ejercicio → inciso. Un segmento sin marca es continuación del anterior y se queda con él.
- * Con `keepOriginal` se respeta el orden de las fotos.
+ * Ordena por actividad (1, 2, 3…) respetando el orden del cuaderno dentro de cada una: las fotos llegan en el orden
+ * en que se tomaron. Un segmento sin marca es continuación del anterior; una marca que solo trae inciso hereda la
+ * actividad en curso; y el texto que abre la primera hoja (el enunciado antes de la primera marca) se queda con la
+ * primera actividad. Con `keepOriginal` se respeta por completo el orden de las fotos.
  */
 export function orderSegments(segs: Segment[], keepOriginal = false): Segment[] {
   const keyed: (Segment & { idx: number })[] = []
   let k = { act: '', ej: '', inciso: '' }
   segs.forEach((s, idx) => {
-    if (s.marked) k = { act: s.act, ej: s.ej, inciso: s.inciso }
+    if (s.marked) k = { act: s.act || k.act, ej: s.act ? s.ej : s.ej || k.ej, inciso: s.inciso }
     keyed.push({ ...s, ...k, idx })
   })
-  if (!keepOriginal) keyed.sort((a, b) => nat(a.act, b.act) || nat(a.ej, b.ej) || nat(a.inciso, b.inciso) || a.idx - b.idx)
+  const primera = keyed.find((s) => s.act)?.act
+  if (primera) {
+    for (const s of keyed) {
+      if (s.act) break
+      s.act = primera
+    }
+  }
+  if (!keepOriginal) keyed.sort((a, b) => nat(a.act, b.act) || a.idx - b.idx)
   return keyed
 }
 
@@ -225,4 +237,41 @@ export function componerCuerpo(ordered: Segment[]): string {
     out.push(s.text.trim())
   }
   return out.join('\n\n')
+}
+
+/**
+ * Revisión de formato del documento ya ensamblado (solo texto, sin mirar imágenes): lo que conviene limpiar antes de
+ * entregarlo. Cada renglón devuelto es un problema concreto con su ubicación.
+ */
+export function revisarFormato(body: string): string[] {
+  const out: string[] = []
+  const lines = body.split('\n')
+  const headings = lines.map((l, i) => ({ l, i })).filter((x) => /^# /.test(x.l))
+  const primero = headings[0]?.i ?? lines.length
+  const lead = lines.slice(0, primero).filter((l) => l.trim())
+  if (lead.length) out.push(`Hay ${lead.length} renglón(es) antes de la primera actividad, sin título: «${lead[0].trim().slice(0, 60)}»`)
+  const nums = headings.map((h) => Number(/(\d+)\s*$/.exec(h.l)?.[1])).filter((n) => Number.isFinite(n))
+  if (nums.length) {
+    const faltan: number[] = []
+    for (let n = Math.min(...nums); n <= Math.max(...nums); n++) if (!nums.includes(n)) faltan.push(n)
+    if (faltan.length) out.push(`Faltan las actividades: ${faltan.join(', ')}.`)
+    const rep = nums.filter((n, i) => nums.indexOf(n) !== i)
+    if (rep.length) out.push(`Actividades con título repetido: ${[...new Set(rep)].join(', ')}.`)
+  }
+  headings.forEach((h, k) => {
+    const fin = headings[k + 1]?.i ?? lines.length
+    if (!lines.slice(h.i + 1, fin).some((l) => l.trim())) out.push(`${h.l.slice(2)} está vacía.`)
+  })
+  let prev = ''
+  let sinResultado = 0
+  lines.forEach((l, i) => {
+    const t = l.trim()
+    if (t && t === prev && !t.startsWith('$$') && !t.startsWith('```') && t.length > 12) out.push(`Renglón duplicado seguido (línea ${i + 1}): «${t.slice(0, 50)}»`)
+    if (t) prev = t
+    if (/^\$\$.*[=+\-]\s*\$\$$/.test(t)) sinResultado++
+  })
+  if (sinResultado) out.push(`${sinResultado} ecuación(es) terminan en "=" o un operador (el alumno no puso resultado); se rellenan con un espacio y conviene verlas.`)
+  const graf = (body.match(/\[Gr[aá]fica/g) ?? []).length
+  if (graf) out.push(`${graf} figura(s) quedaron solo descritas con texto ([Gráfica…]); hay que dibujarlas o revisarlas.`)
+  return out
 }

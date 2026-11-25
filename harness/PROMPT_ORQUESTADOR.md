@@ -5,4 +5,6 @@ Eres el ORQUESTADOR de AlgeTra. No transcribes: repartes hojas a subagentes `tra
 3. Cuando terminen, ejecuta `pnpm harness estado`. Si quedan por_procesar, repite el paso 2 (máximo 3 rondas); si no, termina.
 4. Si un subagente falla o se repite el mismo error en dos, detente y repórtalo; no reintentes a ciegas.
 
+Al terminar la última ronda (o cuando no queden hojas), ejecuta `pnpm harness formato <entrega>` y copia sus observaciones tal cual; no intentes corregirlas.
+
 Al final: una línea con hojas cerradas, hojas en revisión y cuántas quedan. Nada más; no repitas las tablas.

@@ -2,11 +2,12 @@
 
 Objetivo: transcribir la hoja tal como está escrita, rápido y barato. Una sola pasada. Lo ilegible es `[?]`; nunca inventes un dígito.
 
-## Por hoja (4 pasos)
-1. `pnpm harness siguiente` → te da el id y la ruta de la imagen. Mírala UNA vez (la copia mejorada solo si el comando dice que la calidad es mala).
+## Por hoja (5 pasos)
+1. `pnpm harness siguiente` (solo la primera vez) → te da el id y la ruta de la imagen. Mírala UNA vez (la copia mejorada solo si el comando dice que la calidad es mala).
 2. Escribe `transcripcion.md` de una vez, sin pensar en voz alta y sin repasar la imagen otra vez.
-3. `pnpm harness cerrar <id>` (ya valida; no ejecutes `validar` aparte). Si dice "No se puede cerrar", corrige exactamente lo que indica y vuelve a cerrar. Una aritmética que no cuadra NO bloquea: no reexamines la imagen por eso.
-4. Siguiente hoja.
+3. **Revisión de formato (solo del texto que escribiste, sin volver a mirar la imagen)**, antes de cerrar: ¿cada renglón de desarrollo en su `$$…$$`?; ¿sin `# ` encabezados?; ¿tablas como tablas de barras (`| a | b |` con renglón `|---|---|`)?; ¿matrices con el delimitador correcto y filas/columnas completas?; ¿la marca `<!-- ejercicio: act-NN/N -->` donde empieza la actividad?; ¿sin comentarios sobrantes ni fecha/nombre del encabezado? Corrige en el mismo archivo.
+4. `pnpm harness cerrar <id> --siguiente` (valida, cierra y te entrega la hoja siguiente en la misma respuesta; no ejecutes `validar` ni `siguiente` aparte). Si dice "No se puede cerrar", corrige exactamente lo que indica y repite. Una aritmética que no cuadra NO bloquea: no reexamines la imagen por eso.
+5. Repite con la hoja que te dio, hasta que se acabe tu encargo.
 
 ## Formato
 - Texto normal; fórmulas en LaTeX: `$a+b$` en línea, `$$…$$` en renglón propio (cada renglón de desarrollo del alumno, su propio `$$`).

@@ -273,8 +273,11 @@ function conv(el: El): string {
       const t = el.textContent ?? ''
       return run(t, 'nor')
     }
-    case 'mspace':
-      return run(spaceChar(el.getAttribute('width')))
+    case 'mspace': {
+      // Como texto normal: Word respeta los espacios de un renglón de texto y no los colapsa dentro de una fórmula.
+      const w = parseFloat(el.getAttribute('width') ?? '0')
+      return run(spaceChar(el.getAttribute('width')).repeat(w >= 1.5 ? 2 : 1), 'nor')
+    }
     case 'msup':
       return `<m:sSup>${e(conv(k[0]))}<m:sup>${conv(k[1])}</m:sup></m:sSup>`
     case 'msub': {
@@ -321,6 +324,9 @@ function conv(el: El): string {
 /** Convierte LaTeX a un `<m:oMath>` (o `<m:oMathPara>` si es una ecuación destacada). */
 export function latexToOmml(latex: string, display: boolean): OmmlResult {
   try {
+    // Una fórmula que termina en un operador (el alumno dejó un "=" sin resultado) se rellena con un espacio:
+    // sin operando, Word/LibreOffice dibujan un marcador de error ("¿").
+    if (/[=+\-<>]\s*$/.test(latex)) latex = `${latex.trimEnd()}\\;`
     const mathml = temml.renderToString(latex, { xml: true, throwOnError: true, strict: false, displayMode: display })
     const doc = new DOMParser({ onError: () => {} }).parseFromString(mathml, 'text/xml')
     const root = doc.documentElement

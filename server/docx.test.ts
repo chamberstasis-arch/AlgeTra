@@ -100,3 +100,23 @@ describe('DOCX con estilo', () => {
     expect((await partes(r.buffer)).doc).toContain('<m:borderBox>')
   })
 })
+
+describe('limpieza de formato del documento', () => {
+  const con = (text: string) => buildDocx({ title: 't', pages: [{ title: 'p', text }], pageHeaders: false, estilo: PRESETS.limpio })
+  it('una tabla de barras sale como tabla de Word, sin barras sueltas', async () => {
+    const p = await partes((await con('Datos\n\n| $x$ | $y_1$ |\n|---|---|\n| 4 | 3 |\n| 3 | 2 |\n\nFin')).buffer)
+    expect(p.doc).toContain('<w:tbl>')
+    expect((p.doc.match(/<w:tr>/g) ?? []).length).toBe(3)
+    expect(p.doc).not.toContain('|---|')
+  })
+  it('los espacios de \\qquad dentro de una fórmula se escriben como texto normal (no se colapsan)', async () => {
+    const p = await partes((await con('$$a=1 \\qquad b=2$$')).buffer)
+    expect(p.doc).toMatch(/<m:nor\/>[\s\S]*?<m:t xml:space="preserve">  <\/m:t>/)
+  })
+  it('una fórmula que termina en "=" no deja un operando vacío', async () => {
+    const r = await con('$$x + 1 =$$')
+    expect(r.failed).toEqual([])
+    const p = await partes(r.buffer)
+    expect(p.doc).toMatch(/=<\/m:t>[\s\S]*?<m:t xml:space="preserve"> <\/m:t>/)
+  })
+})
