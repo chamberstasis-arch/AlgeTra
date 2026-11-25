@@ -6,9 +6,13 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from '
 import { tmpdir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { loadCorpus } from './corpus'
-import { buildDocx } from './docx'
-import { orderSegments, parseMarkers, safeId, splitSegments, type Segment } from './harness'
+import JSZip from 'jszip'
+import { comparePage } from '../src/shared/metrics'
+import { normalizarEstilo, PRESETS, type Estilo } from '../src/shared/estilo'
+import { runChecks } from './checks'
+import { findExercises, loadCorpus } from './corpus'
+import { buildDocx, type DocxResult } from './docx'
+import { componerCuerpo, lintTranscription, orderSegments, parseMarkers, quitarEncabezado, safeId, splitSegments, type Lint, type Segment } from './harness'
 
 const run = promisify(execFile)
 
@@ -28,6 +32,32 @@ export const natural = (a: string, b: string) => a.localeCompare(b, 'es', { nume
 export async function ensureDirs() {
   for (const d of Object.values(D)) await mkdir(d, { recursive: true })
 }
+/**
+ * Candado entre procesos (varios agentes pueden trabajar a la vez): solo uno a la vez entra a la zona protegida.
+ * Un candado abandonado (el proceso murió) se libera solo a los 30 s.
+ */
+export async function conLock<T>(fn: () => Promise<T>, nombre = 'harness'): Promise<T> {
+  const lock = join(ROOT, `.lock-${nombre}`)
+  const inicio = Date.now()
+  for (;;) {
+    try {
+      await mkdir(lock)
+      break
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+      const st = await stat(lock).catch(() => null)
+      if (st && Date.now() - st.mtimeMs > 30_000) await rm(lock, { recursive: true, force: true })
+      else if (Date.now() - inicio > 90_000) throw new Error('No se pudo obtener el candado del espacio de trabajo (otro proceso lo tiene tomado).')
+      else await new Promise((r) => setTimeout(r, 40 + Math.random() * 120))
+    }
+  }
+  try {
+    return await fn()
+  } finally {
+    await rm(lock, { recursive: true, force: true })
+  }
+}
+
 export const ls = async (dir: string) => (existsSync(dir) ? (await readdir(dir)).filter((f) => !f.startsWith('.')) : [])
 const isDir = async (p: string) => (await stat(p).catch(() => null))?.isDirectory() ?? false
 
@@ -63,8 +93,10 @@ export async function analyzeImage(path: string): Promise<Calidad | null> {
     const [ancho, alto] = dims.stdout.trim().split(' ').map(Number)
     const nitidez = contraste > 0 ? Number(lap.stdout) / contraste : 0
     const banderas: string[] = []
-    if (nitidez < 1.0) banderas.push('borrosa')
-    else if (nitidez < 2.5) banderas.push('algo_borrosa')
+    // Umbrales ajustados con 62 fotos reales de libreta (nitidez 1.2–3.0, todas legibles a tamaño completo): lo bajo
+    // es sobre todo trazo tenue o reflejo, no desenfoque. Con 2.5 casi toda foto salía marcada y el aviso no servía.
+    if (nitidez < 0.8) banderas.push('borrosa')
+    else if (nitidez < 1.3) banderas.push('algo_borrosa')
     if (brillo < 0.35) banderas.push('oscura')
     if (contraste < 0.03) banderas.push('bajo_contraste')
     if (Math.min(ancho, alto) < 1000) banderas.push('baja_resolucion')
@@ -74,6 +106,23 @@ export async function analyzeImage(path: string): Promise<Calidad | null> {
     return c
   } catch {
     return null
+  }
+}
+
+/**
+ * Las fotos de celular suelen guardar los píxeles de lado y una etiqueta EXIF que dice cómo girarlos. Un visor que
+ * ignora la etiqueta (como el que lee el agente) ve la hoja acostada. Se aplica el giro a los píxeles y se quita la etiqueta.
+ * Devuelve `true` si cambió algo.
+ */
+export async function normalizarOrientacion(path: string): Promise<boolean> {
+  try {
+    const { stdout } = await run('magick', ['identify', '-format', '%[orientation]', `${path}[0]`])
+    const o = stdout.trim()
+    if (!o || o === 'Undefined' || o === 'TopLeft') return false
+    await run('magick', [path, '-auto-orient', '-quality', '92', path])
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -113,16 +162,84 @@ export interface IngestResult {
   avisos: string[]
 }
 
+const reservados = new Set<string>()
+
+/** Límites contra ZIP desmedidos o maliciosos. */
+const ZIP_MAX_ARCHIVOS = 400
+const ZIP_MAX_BYTES = 1.5 * 1024 ** 3
+const BASURA_ZIP = /(^|\/)(__MACOSX|\.[^/]*|thumbs\.db|desktop\.ini)(\/|$)/i
+
+/**
+ * Entrada de un ZIP: cada archivo de dentro (imagen, PDF, DOCX…, también en subcarpetas y en el orden natural de su
+ * ruta) se procesa como si se hubiera subido suelto, todos a la misma entrega.
+ */
+async function ingestZip(filename: string, data: Buffer, entrega: string, profundidad: number): Promise<IngestResult> {
+  const res: IngestResult = { guardadas: [], avisos: [] }
+  let zip: JSZip
+  try {
+    zip = await JSZip.loadAsync(data)
+  } catch {
+    res.avisos.push(`${filename}: no se pudo abrir el ZIP (¿está dañado o tiene contraseña?).`)
+    return res
+  }
+  const entradas = Object.values(zip.files).filter((f) => !f.dir && !BASURA_ZIP.test(f.name)).sort((a, b) => natural(a.name, b.name))
+  if (!entradas.length) {
+    res.avisos.push(`${filename}: el ZIP no contiene archivos.`)
+    return res
+  }
+  if (entradas.length > ZIP_MAX_ARCHIVOS) {
+    res.avisos.push(`${filename}: trae ${entradas.length} archivos; el máximo por ZIP es ${ZIP_MAX_ARCHIVOS}. Pártelo en dos.`)
+    return res
+  }
+  const tam = (f: JSZip.JSZipObject) => ((f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0)
+  if (entradas.reduce((n, f) => n + tam(f), 0) > ZIP_MAX_BYTES) {
+    res.avisos.push(`${filename}: descomprimido pesaría demasiado (máximo ${(ZIP_MAX_BYTES / 1024 ** 3).toFixed(1)} GB).`)
+    return res
+  }
+  // Se convierten de 3 en 3 (PDF y fotos son trabajo de CPU), pero el resultado queda en el orden de la ruta.
+  const resultados: IngestResult[] = new Array(entradas.length)
+  let siguiente = 0
+  await Promise.all(
+    Array.from({ length: Math.min(3, entradas.length) }, async () => {
+      while (siguiente < entradas.length) {
+        const i = siguiente++
+        const f = entradas[i]
+        const nombre = f.name.split('/').pop()!
+        resultados[i] = await ingestArchivo(nombre, Buffer.from(await f.async('uint8array')), entrega, profundidad + 1).catch((e) => ({
+          guardadas: [],
+          avisos: [`${nombre}: ${e instanceof Error ? e.message.split('\n')[0] : e}`],
+        }))
+      }
+    }),
+  )
+  for (const r of resultados) {
+    res.guardadas.push(...r.guardadas)
+    res.avisos.push(...r.avisos)
+  }
+  return res
+}
+
 export async function ingest(filename: string, data: Buffer, entrega: string): Promise<IngestResult> {
+  return ingestArchivo(filename, data, entrega, 0)
+}
+
+async function ingestArchivo(filename: string, data: Buffer, entrega: string, profundidad: number): Promise<IngestResult> {
   await ensureDirs()
+  if (extname(filename).toLowerCase() === '.zip') {
+    if (profundidad >= 2) return { guardadas: [], avisos: [`${filename}: ZIP dentro de ZIP dentro de ZIP; se omite.`] }
+    return ingestZip(filename, data, entrega, profundidad)
+  }
   const eName = entrega ? safeId(entrega) : ''
   const dir = eName ? join(D.por_procesar, eName) : D.por_procesar
   await mkdir(dir, { recursive: true })
   const ext = extname(filename).toLowerCase()
   const stem = safeId(filename)
+  const mios: string[] = []
   const unique = (name: string) => {
     let n = name
-    for (let i = 2; existsSync(join(dir, n)); i++) n = name.replace(/(\.[^.]+)$/, `-${i}$1`)
+    for (let i = 2; existsSync(join(dir, n)) || reservados.has(join(dir, n)); i++) n = name.replace(/(\.[^.]+)$/, `-${i}$1`)
+    reservados.add(join(dir, n))
+    mios.push(join(dir, n))
     return n
   }
   const res: IngestResult = { guardadas: [], avisos: [] }
@@ -131,6 +248,7 @@ export async function ingest(filename: string, data: Buffer, entrega: string): P
     if (IMG_EXT.has(ext)) {
       const name = unique(`${stem}${ext}`)
       await writeFile(join(dir, name), data)
+      await normalizarOrientacion(join(dir, name))
       res.guardadas.push(name)
     } else if (['.heic', '.heif'].includes(ext)) {
       const src = join(tmp, `in${ext}`)
@@ -155,17 +273,65 @@ export async function ingest(filename: string, data: Buffer, entrega: string): P
         await rename(join(tmp, f), join(dir, name))
         res.guardadas.push(name)
       }
-    } else res.avisos.push(`${filename}: formato no admitido (usa imágenes, PDF o DOCX).`)
+    } else res.avisos.push(`${filename}: formato no admitido (usa imágenes, PDF, DOCX o un ZIP con ellos).`)
   } catch (e) {
     res.avisos.push(`${filename}: falló la conversión (${e instanceof Error ? e.message.split('\n')[0] : e}).`)
   } finally {
     await rm(tmp, { recursive: true, force: true })
+    for (const m of mios) reservados.delete(m) // el archivo ya existe en disco, o la conversión falló
   }
   for (const n of res.guardadas) {
     const q = await analyzeImage(join(dir, n))
     if (q?.nivel === 'mala') res.avisos.push(`${n}: calidad baja (${q.banderas.join(', ')}). Conviene volver a fotografiarla.`)
   }
   return res
+}
+
+/**
+ * Mueve las imágenes sueltas de `por_procesar` (sin entrega) a una entrega. Sin entrega no hay documento final
+ * ensamblado, así que esto es lo que permite que unas fotos subidas sin nombre acaben en un solo documento.
+ */
+export async function agruparSueltas(entrega: string): Promise<{ movidas: number; entrega: string }> {
+  if (!entrega.trim()) throw new Error('Escribe un nombre para la entrega.')
+  const nombre = safeId(entrega)
+  const sueltas = (await ls(D.por_procesar)).filter((f) => IMG_EXT.has(extname(f).toLowerCase()))
+  let n = 0
+  if (sueltas.length) {
+    const dir = join(D.por_procesar, nombre)
+    await mkdir(dir, { recursive: true })
+    for (const f of sueltas) {
+      let destino = f
+      for (let i = 2; existsSync(join(dir, destino)); i++) destino = f.replace(/(\.[^.]+)$/, `-${i}$1`)
+      await rename(join(D.por_procesar, f), join(dir, destino))
+      n++
+    }
+  }
+  // Las hojas ya tomadas o cerradas que quedaron sin entrega se unen a la misma, para que el documento final las incluya.
+  for (const estado of ['en_proceso', 'procesadas', 'revision'] as const)
+    for (const id of await ls(D[estado])) {
+      const dir = join(D[estado], id)
+      const meta = await readFile(join(dir, 'meta.json'), 'utf8').then(JSON.parse).catch(() => null)
+      if (!meta || meta.entrega) continue
+      await writeFile(join(dir, 'meta.json'), JSON.stringify({ ...meta, entrega: nombre }, null, 2))
+      const inf = await readFile(join(dir, 'informe.json'), 'utf8').then(JSON.parse).catch(() => null)
+      if (inf) await writeFile(join(dir, 'informe.json'), JSON.stringify({ ...inf, entrega: nombre }, null, 2))
+      n++
+    }
+  return { movidas: n, entrega: nombre }
+}
+
+const miniaturas = new Map<string, Buffer>()
+/** JPEG pequeño de una imagen, para las vistas en cuadrícula (la foto completa pesa ~1 MB). Se guarda en memoria. */
+export async function miniatura(path: string, ancho = 260): Promise<Buffer> {
+  const st = await stat(path)
+  const key = `${path}:${st.mtimeMs}:${ancho}`
+  const hit = miniaturas.get(key)
+  if (hit) return hit
+  const { stdout } = await run('magick', [path, '-auto-orient', '-resize', `${ancho}x`, '-quality', '70', 'jpg:-'], { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 } as never)
+  const buf = stdout as unknown as Buffer
+  if (miniaturas.size > 400) miniaturas.delete(miniaturas.keys().next().value!)
+  miniaturas.set(key, buf)
+  return buf
 }
 
 // ───────── Hojas ─────────
@@ -224,6 +390,7 @@ export interface Ensamblado {
   formulas: number
   fallos: { latex: string; error: string }[]
   requierenRevision: string[]
+  ordenOriginal: boolean
   creadoEn: string
 }
 
@@ -237,13 +404,16 @@ export async function ensamblar(entrega: string, opts: { ordenOriginal?: boolean
   const segs: Segment[] = []
   const requierenRevision: string[] = []
   for (const [i, h] of cerradas.entries()) {
-    const src = await readFile(join(h.dir!, 'transcripcion.md'), 'utf8')
+    const src = quitarEncabezado(await readFile(join(h.dir!, 'transcripcion.md'), 'utf8'))
     segs.push(...splitSegments(src, i + 1))
     const inf = h.informe as { requierenRevision?: string[]; aprobada?: boolean } | null
     if (h.estado === 'revision' && !inf?.aprobada) requierenRevision.push(`${h.id}: ${(inf?.requierenRevision ?? []).join('; ') || 'pendiente de revisión'}`)
   }
   const ordered = orderSegments(segs, opts.ordenOriginal)
-  const body = ordered.map((s) => s.text.trim()).join('\n\n')
+  const sinActividad = [...new Set(ordered.filter((s) => !s.act).map((s) => s.page))]
+  if (sinActividad.length)
+    requierenRevision.push(`Hoja(s) ${sinActividad.join(', ')} de la entrega sin actividad asignada (falta la marca \`<!-- ejercicio: act-NN/N -->\`): su contenido va al inicio, sin título de actividad.`)
+  const body = componerCuerpo(ordered)
 
   // Ejercicios de la base que no aparecen en la entrega (para detectar hojas faltantes).
   const acts = new Set(ordered.filter((s) => s.marked && s.act).map((s) => s.act))
@@ -252,7 +422,12 @@ export async function ensamblar(entrega: string, opts: { ordenOriginal?: boolean
   for (const a of (await loadCorpus()).filter((a) => acts.has(a.id)))
     for (const e of a.exercises) if (!vistos.has(e.ref)) faltantes.push(e.ref)
 
-  const docx = await buildDocx({ title: entrega, subtitle: `Transcripción ensamblada · ${cerradas.length} hoja(s) · ${new Date().toLocaleDateString('es')}`, pages: [{ title: entrega, text: body }], pageHeaders: false })
+  const docx = await buildDocx({
+    title: entrega,
+    pages: [{ title: entrega, text: body }],
+    pageHeaders: false,
+    estilo: await leerEstilo(entrega),
+  })
   const out = join(D.entregas, safeId(entrega))
   await mkdir(out, { recursive: true })
   await writeFile(join(out, 'documento.docx'), docx.buffer)
@@ -267,10 +442,101 @@ export async function ensamblar(entrega: string, opts: { ordenOriginal?: boolean
     formulas: docx.formulas,
     fallos: docx.failed.map((f) => ({ latex: f.latex, error: f.error })),
     requierenRevision,
+    ordenOriginal: !!opts.ordenOriginal,
     creadoEn: new Date().toISOString(),
   }
   await writeFile(join(out, 'ensamblado.json'), JSON.stringify(result, null, 2))
   return result
+}
+
+// ───────── Estilo por entrega ─────────
+
+const dirEntrega = (entrega: string) => join(D.entregas, safeId(entrega))
+
+/** Estilo guardado de la entrega; sin archivo, el preset `limpio`. */
+export async function leerEstilo(entrega: string): Promise<Estilo> {
+  if (!entrega) return PRESETS.limpio
+  const raw = await readFile(join(dirEntrega(entrega), 'estilo.json'), 'utf8').then(JSON.parse).catch(() => null)
+  return normalizarEstilo(raw)
+}
+
+export async function guardarEstilo(entrega: string, raw: unknown): Promise<Estilo> {
+  const estilo = normalizarEstilo(raw)
+  await mkdir(dirEntrega(entrega), { recursive: true })
+  await writeFile(join(dirEntrega(entrega), 'estilo.json'), JSON.stringify(estilo, null, 2))
+  return estilo
+}
+
+// ───────── Regenerar documentos (sin volver a procesar nada) ─────────
+
+/** DOCX de una hoja a partir de su transcripción actual y el estilo de su entrega (mismo formato que el ensamblado). */
+export async function docxHoja(dir: string, id: string, entrega: string): Promise<DocxResult> {
+  const src = quitarEncabezado(await readFile(join(dir, 'transcripcion.md'), 'utf8'))
+  const body = componerCuerpo(orderSegments(splitSegments(src, 1), true))
+  const docx = await buildDocx({ title: id, pages: [{ title: id, text: body }], pageHeaders: false, estilo: await leerEstilo(entrega) })
+  await writeFile(join(dir, 'documento.docx'), docx.buffer)
+  await rm(join(dir, 'documento.pdf'), { force: true })
+  return docx
+}
+
+/** Si ya no queda nada por procesar de la entrega, la ensambla sola: un solo documento con todas las actividades en orden. */
+export async function ensamblarSiCompleta(entrega: string): Promise<Ensamblado | null> {
+  if (!entrega) return null
+  const mias = (await listHojas()).filter((h) => h.entrega === entrega)
+  if (mias.some((h) => h.estado === 'por_procesar' || h.estado === 'en_proceso')) return null
+  if (!mias.some((h) => h.estado === 'procesadas' || h.estado === 'revision')) return null
+  return ensamblar(entrega)
+}
+
+/**
+ * Rehace los DOCX de todas las hojas cerradas de la entrega y, si ya estaba ensamblada, el documento ensamblado
+ * (con el mismo orden que tenía). Es lo que hace que cambiar el estilo o corregir una hoja no cueste procesar de nuevo.
+ */
+export async function regenerarEntrega(entrega: string): Promise<Ensamblado | null> {
+  const hojas = (await listHojas()).filter((h) => h.entrega === entrega && (h.estado === 'procesadas' || h.estado === 'revision') && h.dir)
+  for (const h of hojas) await docxHoja(h.dir!, h.id, entrega)
+  const previo = await readFile(join(dirEntrega(entrega), 'ensamblado.json'), 'utf8').then(JSON.parse).catch(() => null)
+  return previo ? ensamblar(entrega, { ordenOriginal: !!previo.ordenOriginal }) : null
+}
+
+export interface GuardadoHoja {
+  lint: Lint
+  fallos: { latex: string; error: string }[]
+  ensamblado: Ensamblado | null
+}
+
+/** Revisa una transcripción (la misma validación que usa el agente) sin bloquear: quien edita es una persona. */
+export async function revisarTexto(texto: string): Promise<{ lint: Lint; fallos: { latex: string; error: string }[] }> {
+  const m = parseMarkers(texto)
+  const exercises = m.refs.length ? await findExercises(m.refs) : []
+  const checks = m.body.trim() ? runChecks(m.body, exercises) : null
+  const docx = await buildDocx({ title: 'revisión', pages: [{ title: 'p', text: m.body }], pageHeaders: false })
+  const lint = lintTranscription(m, checks, docx.failed)
+  const unknown = m.refs.filter((r) => !exercises.some((e) => e.ref === r))
+  if (unknown.length) lint.errors.push(`Ejercicio(s) que no existen en la base: ${unknown.join(', ')}.`)
+  return { lint, fallos: docx.failed.map((f) => ({ latex: f.latex, error: f.error })) }
+}
+
+/** Guarda la edición de una persona sobre una hoja cerrada y regenera todo lo que depende de ella. */
+export async function guardarTranscripcion(dir: string, id: string, entrega: string, texto: string): Promise<GuardadoHoja> {
+  if (!texto.trim()) throw new Error('La transcripción no puede quedar vacía.')
+  await writeFile(join(dir, 'transcripcion.md'), texto.endsWith('\n') ? texto : texto + '\n')
+  const { lint, fallos } = await revisarTexto(texto)
+  await docxHoja(dir, id, entrega)
+  return { lint, fallos, ensamblado: entrega ? await regenerarEntrega(entrega) : null }
+}
+
+/** La corrección de la persona pasa a ser la referencia: se miden las diferencias con lo que leyó el agente. */
+export async function aprobarHoja(dir: string, id: string): Promise<Record<string, any>> {
+  const informe = JSON.parse(await readFile(join(dir, 'informe.json'), 'utf8'))
+  const original = parseMarkers(await readFile(join(dir, 'transcripcion.original.md'), 'utf8'))
+  const actual = parseMarkers(await readFile(join(dir, 'transcripcion.md'), 'utf8'))
+  informe.metricas = comparePage(original.body, actual.body)
+  informe.aprobada = true
+  informe.aprobadaEn = new Date().toISOString()
+  await docxHoja(dir, id, informe.entrega ?? '')
+  await writeFile(join(dir, 'informe.json'), JSON.stringify(informe, null, 2))
+  return informe
 }
 
 // ───────── PDF para visualizar el DOCX ─────────

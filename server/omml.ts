@@ -254,6 +254,8 @@ function conv(el: El): string {
     case 'annotation-xml':
       return ''
     case 'mrow': {
+      // Temml dibuja \boxed{…} como un mrow con borde en el estilo: en Word es un recuadro nativo.
+      if (/border\s*:/.test(el.getAttribute('style') ?? '')) return `<m:borderBox>${e(row(k))}</m:borderBox>`
       const f = fenceOf(el)
       if (!f) return row(k)
       if (f.inner.length === 1 && name(f.inner[0]) === 'mtable') return tableXml(f.inner[0], f.beg, f.end, f.grow)

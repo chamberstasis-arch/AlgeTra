@@ -55,6 +55,11 @@ Los comentarios `<!-- … -->` son el canal del agente hacia la persona (dudas, 
 - **Fidelidad por instrucción:** transcribir lo visto, no corregir al alumno, `[?]` en lugar de adivinar.
 - **Segunda pasada obligatoria** celda por celda antes de validar.
 - **Recalculo aritmético independiente** del modelo: es la red de seguridad contra dígitos mal leídos.
+  - Cubre: matrices (suma, resta, producto, determinante, transpuesta), **números** (fracciones, decimales, potencias, raíces `\sqrt`, divisiones), **vectores** (`2i − 3j + 4k` o `(2, −3, 4)`; suma, escalar, producto punto, producto cruz —también como determinante `| i j k |`— y norma `|v|`).
+  - Las raíces y divisiones se comparan con tolerancia; un decimal escrito se acepta si es el **redondeo o el truncamiento** del valor exacto (`√21 = 4.58`), no si es otro (`4.4`).
+  - **Símbolos definidos en la misma hoja** (`v = 4i − 2j + k`, `A = …`) se usan para comprobar las líneas siguientes (`|v| = √(16+4+1)`). Solo las letras `A–Z`, `u v w p q`: las incógnitas `x y z` no se arrastran entre ejercicios. Redefinir un símbolo no es una contradicción.
+  - **No cubre:** funciones trigonométricas (`cos α = a/|v|` queda no verificable), inversas, escalonamiento paso a paso, ni nada con variables sin definir. Lo que no entiende lo marca *no verificable*, nunca *correcto*.
+  - Medido sobre la primera hoja real (act-23): de 35 fórmulas, 0 verificadas antes y 12 ahora; 0 falsos positivos en las 370 ecuaciones de los 32 enunciados.
 - **El agente no lee `corpus/`:** el validador compara por él. Si acomodara su lectura a la respuesta esperada, se perdería la medición (es una instrucción; el entorno no lo impide técnicamente).
 - **Referencia = tu corrección,** como en el MVP: solo las hojas aprobadas cuentan.
 
@@ -89,6 +94,19 @@ Los comentarios `<!-- … -->` son el canal del agente hacia la persona (dudas, 
 
 ## 5. Lo que se verificó y lo que no
 
+## Estilo del documento y edición sin reprocesar
+
+El contenido (lo que transcribió el agente) y la presentación están separados. El DOCX y el PDF **se derivan** de `transcripcion.md`, así que corregir una hoja o cambiar el estilo **no requiere volver a procesar nada ni gasta plan**.
+
+- **Estilo por entrega**, en `trabajo/entregas/<entrega>/estilo.json`. Controla tipografía (Calibri, Cambria, Arial, Times New Roman, Georgia, Verdana), tamaño, interlineado, márgenes, papel, alineación, ecuaciones (centradas o a la izquierda), color de títulos, título del documento, número de página y, para las gráficas: paleta, grosor, cuadrícula, ancho y tamaño de etiquetas. Todo valor se recorta a límites sensatos (`src/shared/estilo.ts`).
+- **Presets** `limpio` (por defecto), `cuaderno`, `formal`, `compacto`.
+- **Variar:** deriva un estilo de una semilla (por defecto el nombre de la entrega). La misma semilla da siempre el mismo estilo; otra semilla, otro. Solo elige combinaciones legibles.
+- **Por defecto no se imprime el nombre interno de la entrega** como título (`titulo: ninguno`): el documento sale limpio. Se puede activar.
+- **Las ecuaciones siguen siendo nativas de Word con cualquier estilo.** Su tipografía es la matemática de Word (Cambria Math); el estilo cambia el texto, los márgenes, el espaciado y las gráficas. Los números de los ejes de una gráfica no se pueden ocultar con el estilo: son parte de lo que escribió el alumno.
+- **Interfaz** (`pnpm ui`): botón «Estilo» en cada entrega (preset, Variar, Otra variación, campos manuales, «Aplicar y regenerar») y pestaña «Editar transcripción» en cada hoja cerrada («Guardar y regenerar» / «Guardar y aprobar»). Al guardar se rehacen el DOCX de la hoja y el de la entrega, con el mismo orden que tenía.
+- **Línea de comandos:** `pnpm harness estilo <entrega> [--preset p | --variar [semilla]]`.
+- Las fuentes solo se ven como en el estilo si el Word de quien abre el documento las tiene; la vista previa en PDF (LibreOffice) puede sustituir alguna.
+
 Verificado en esta máquina (33 pruebas automáticas pasan; flujo de extremo a extremo con hojas simuladas y la interfaz en un navegador): subida de imágenes, PDF y DOCX; calidad de imagen (detectó una foto borrosa); puerto alterno cuando el 8080 está ocupado; `siguiente`, `validar`, `cerrar`, `aprobar`, `medir`, `aprender`, `actividades`; ensamblado de 3 hojas desordenadas en el orden correcto con la gráfica en su posición; vista del PDF con ecuaciones y gráfica; descarga de DOCX/PDF/MD; las notas del agente no llegan al DOCX.
 
 **No verificado:**
@@ -114,3 +132,39 @@ Riesgos que quedan, que el entorno no puede eliminar:
 - **Gráficas:** solo cartesianas 2D (rectas, vectores, puntos, funciones, polígonos). Sin planos 3D ni geometría compleja (esas van como `[Gráfica: …]` y a revisión). La imagen no es editable en Word.
 - **Ensamblado:** une lo marcado por el agente; si no marcó ejercicios, el orden es el de las fotos. Los incisos se ordenan alfabéticamente.
 - **Evolución:** el mismo manual y las mismas herramientas sirven si después el agente corre detrás de una API de pago por uso (OpenRouter o la de Alibaba); solo cambia quién lo ejecuta. La interfaz **no** lanza al agente: lo inicias tú, como pide el plan.
+
+## Entregas grandes: ZIP, un solo documento y formato
+
+**Carga.** Un ZIP (también con subcarpetas, ZIP dentro de ZIP hasta dos niveles) se sube como cualquier archivo, por la interfaz o con `pnpm harness importar <archivo.zip> --entrega <nombre>`. Cada archivo de dentro (JPG, PNG, WebP, HEIC, PDF —cada página es una imagen—, DOCX) se convierte y va a la misma entrega, en el orden natural de su ruta. Se ignoran `__MACOSX`, archivos ocultos, `Thumbs.db`; límites: 400 archivos y 1.5 GB descomprimido por ZIP. Cada subida es una entrega: si no se escribe nombre, se genera uno nuevo (o el del ZIP).
+
+**Un solo documento.** Al cerrar la última hoja de la entrega, `cerrar` la ensambla sola. El orden es por actividad (1, 2, 3…) → ejercicio → inciso, no el orden de llegada. Una hoja que continúa a la anterior (sin marca) se queda con ella. Si una hoja no trae marca de actividad, el ensamblado lo avisa y su contenido va al inicio sin título.
+
+**Formato.** Cada actividad lleva solo `Actividad N` (derivado de la marca `act-NN`) y debajo la transcripción. No hay subtítulo con fecha ni nombre interno; el renglón de encabezado del alumno (fecha y/o "Actividad N") se quita al ensamblar. El título del documento completo es opcional (estilo → «Título del documento»).
+
+**Separación.** Los renglones del desarrollo van apretados; el aire grande solo se deja antes de cada inciso o numeral (`a)`, `1.`, `iv)`), y se escala con el estilo (`espaciado`: compacto/normal/amplio). Las ecuaciones van a la izquierda con una sangría pequeña (como en la libreta); «centradas» sigue siendo opción. «Cada actividad en hoja nueva» es opcional.
+
+## Ejemplo de formato (extraer el estilo de un documento)
+
+En «Estilo» → «Desde un ejemplo…» se sube un DOCX o un PDF y se propone un estilo a partir de él (`pnpm harness estilo <entrega> --desde ejemplo.docx` hace lo mismo y lo aplica). Es **determinista, sin modelo**: un ejemplo hecho por una IA suele traer formato directo, fuentes sueltas y valores inconsistentes, así que cada valor es el **más frecuente ponderado por cantidad de texto**, nunca el primero que aparece, y lo que no se puede asegurar se reporta como «no se pudo asegurar» en lugar de inventarse. La propuesta no se guarda sola: se ve, se ajusta y se aplica.
+
+- **DOCX** (lo más preciso): tipografía (resuelve fuentes de tema y los valores por defecto de Word), tamaño, interlineado, espacio entre párrafos, alineación, color de títulos, alineación de las ecuaciones nativas, salto de hoja entre actividades, papel, márgenes y número de página.
+- **PDF**: tipografía y tamaño del texto, papel, márgenes, justificado o no, número de página, color de títulos y una estimación de interlineado y espaciado (marcada como incierta). No puede saber cómo están alineadas las ecuaciones.
+- **Foto o captura**: se rechaza con un mensaje claro; de una imagen no se leen con certeza tipografías ni márgenes. Se pide el DOCX original o un PDF.
+- Una tipografía que no admitimos se sustituye por la más parecida y se avisa; las ecuaciones del ejemplo no se copian (las nuestras siempre son nativas).
+- Medido de ida y vuelta: un documento generado con cada preset devuelve ese mismo estilo al extraerlo (13 pruebas, DOCX y PDF).
+
+## Interfaz
+
+Una sola acción principal (soltar un ZIP o fotos). Las entregas son una lista con barra de progreso; al abrir una se ven Documento, Hojas (miniaturas con un punto de estado), Estilo y Avisos. Las fotos subidas sin nombre quedan como «Hojas sin entrega» y se agrupan en una entrega con un botón (`pnpm harness agrupar <entrega>`). Las miniaturas se generan al vuelo (JPEG pequeño en caché), en vez de cargar cada foto completa.
+
+## Lo medido con 62 fotos reales de libreta
+
+45 de 62 fotos traían la orientación guardada como etiqueta EXIF (píxeles de lado): ahora se aplica el giro al subirlas. Con las umbrales anteriores, 61 de 62 salían marcadas «algo borrosa» (el aviso no distinguía nada y obligaba a mirar una segunda imagen por hoja); se recalibró con las fotos reales (nitidez 1.2–3.0, todas legibles a tamaño completo).
+
+## Varios agentes a la vez (orquestador + subagentes)
+
+`pnpm harness siguiente` y el ensamblado final corren bajo un candado entre procesos (`conLock`): dos agentes nunca reciben la misma hoja y cada una lleva su orden. Se probó con 4 procesos simultáneos (4 hojas distintas, orden 1–4, un solo documento al cerrar). El candado abandonado se libera a los 30 s.
+
+- `.qwen/agents/transcriptor.md`: subagente que procesa hasta 3 hojas con contexto limpio y devuelve una tabla de ≤8 líneas.
+- `harness/PROMPT_ORQUESTADOR.md` (botón «Prompt: orquestador» en la UI): una sola sesión lanza 3 subagentes en paralelo por ronda, máximo 3 rondas (≈27 hojas), y reporta una tabla unida.
+- No verificado con Qwen Code real: que respete el paralelismo y que `.qwen/agents/` se descubra en el proyecto (la documentación no indica límite de concurrencia).

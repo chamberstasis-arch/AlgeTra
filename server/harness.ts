@@ -9,15 +9,19 @@ export interface Markers {
   doubts: string[]
   /** Texto sin comentarios: es lo que se mide y se exporta. */
   body: string
+  /** Contenido de todos los comentarios `<!-- … -->` (las notas del agente). */
+  comments: string[]
 }
 
 /** Los comentarios HTML son el canal del agente hacia la persona; no llegan al DOCX. */
 export function parseMarkers(source: string): Markers {
   const refs: string[] = []
   const doubts: string[] = []
+  const comments: string[] = []
   const body = source
     .replace(/<!--([\s\S]*?)-->/g, (_, inner: string) => {
       const t = inner.trim()
+      comments.push(t)
       const ej = /^ejercicios?\s*:\s*(.+)$/i.exec(t)
       if (ej) refs.push(...ej[1].split(/[,\s]+/).filter(Boolean))
       else if (/^duda\s*:/i.test(t)) doubts.push(t.replace(/^duda\s*:\s*/i, ''))
@@ -25,7 +29,7 @@ export function parseMarkers(source: string): Markers {
     })
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-  return { refs: [...new Set(refs)], doubts, body }
+  return { refs: [...new Set(refs)], doubts, body, comments }
 }
 
 export interface Lint {
@@ -45,12 +49,18 @@ export function dollarBalance(body: string): { display: number; inline: number }
   return { display, inline }
 }
 
+const SELLO_RE = /\b(sello|sellos|sellado|estampilla|timbre)\b/i
+
 export function lintTranscription(m: Markers, checks: ChecksResponse | null, failedFormulas: { latex: string; error: string }[]): Lint {
   const errors: string[] = []
   const needsReview: string[] = []
   const info: string[] = []
 
   if (m.body.replace(/\s/g, '').length < 3) errors.push('La transcripción está vacía.')
+
+  // Los sellos se ignoran por completo: ni transcritos ni comentados.
+  if (SELLO_RE.test(m.body) || m.comments.some((c) => SELLO_RE.test(c)))
+    errors.push('Se menciona un sello. Los sellos se ignoran por completo: no se transcriben ni se comentan. Quita esa mención (si tapa escritura, habla de "zona ilegible").')
 
   const bal = dollarBalance(m.body)
   if (bal.display % 2) errors.push('Hay un `$$` sin cerrar.')
@@ -74,7 +84,7 @@ export function lintTranscription(m: Markers, checks: ChecksResponse | null, fai
     for (const c of bad) {
       const cells = (c.cells ?? []).map((x) => `celda (${x.row},${x.col}): escrito ${x.right}, esperado ${x.left}`).join('; ')
       errors.push(
-        `La aritmética no cuadra en  ${c.latex}  →  ${c.detail}${cells ? ` [${cells}]` : ''}. ` +
+        `La aritmética no cuadra en  ${c.latex}  →  ${c.detail.replace(/\.$/, '')}${cells ? ` [${cells}]` : ''}. ` +
           'Vuelve a mirar la imagen en esa celda: o es un dígito mal leído, o el error es del alumno (se transcribe tal cual).',
       )
     }
@@ -156,4 +166,64 @@ export function orderSegments(segs: Segment[], keepOriginal = false): Segment[] 
   })
   if (!keepOriginal) keyed.sort((a, b) => nat(a.act, b.act) || nat(a.ej, b.ej) || nat(a.inciso, b.inciso) || a.idx - b.idx)
   return keyed
+}
+
+// ───────── Presentación del documento final: título de actividad y limpieza del encabezado ─────────
+
+const FECHA = String.raw`\d{1,2}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{2,4}`
+const ACTIVIDAD = String.raw`(?:actividad|activ\.?|act\.?|tarea)\s*(?:n[o°º.]*\s*)?\d+`
+const SEP = String.raw`[\s,:;\-–—]*`
+/** Un renglón que solo trae fecha y/o "Actividad N" (con "Fecha:" opcional). */
+const ENCABEZADO_RE = new RegExp(`^\\s*(?:fecha\\s*:?\\s*)?(?:${FECHA})?${SEP}(?:${ACTIVIDAD})?${SEP}(?:${FECHA})?\\s*\\.?\\s*$`, 'i')
+const TIENE_DATO_RE = new RegExp(`(?:${FECHA})|(?:${ACTIVIDAD})`, 'i')
+
+const PREFIJO_RE = new RegExp(`^\\s*(?:fecha\\s*:?\\s*)?(?:${FECHA})?${SEP}(?:${ACTIVIDAD})${SEP}(?:${FECHA})?${SEP}(.*)$`, 'i')
+
+/**
+ * Quita del inicio de una hoja el encabezado que escribió el alumno (fecha y/o "Actividad N"): el documento final
+ * pone su propio título de actividad, así que eso sobra. Si el renglón sigue con el enunciado ("Actividad 6 – Resolver
+ * por eliminación…"), se quita solo el prefijo y el enunciado se conserva. Salta líneas en blanco y comentarios; solo
+ * mira los primeros renglones con contenido.
+ */
+export function quitarEncabezado(source: string): string {
+  const lines = source.replace(/\r\n?/g, '\n').split('\n')
+  let vistos = 0
+  for (let i = 0; i < lines.length && vistos < 2; i++) {
+    const t = lines[i].trim()
+    if (!t || /^<!--[\s\S]*-->$/.test(t)) continue
+    if (ENCABEZADO_RE.test(t) && TIENE_DATO_RE.test(t)) {
+      lines.splice(i, 1)
+      i--
+      vistos++
+      continue
+    }
+    const resto = PREFIJO_RE.exec(t)?.[1]?.trim()
+    if (resto) {
+      lines[i] = resto
+      break
+    }
+    break
+  }
+  return lines.join('\n')
+}
+
+/** `act-24` → `Actividad 24`. Si el id no trae número, se deja tal cual. */
+export function tituloActividad(act: string): string {
+  const n = /(\d+)\s*$/.exec(act)
+  return n ? `Actividad ${Number(n[1])}` : act
+}
+
+/**
+ * Une segmentos ya ordenados en el cuerpo del documento: cada actividad lleva solo su título ("Actividad 24") y
+ * debajo la transcripción. Lo que no tiene actividad asignada va sin título.
+ */
+export function componerCuerpo(ordered: Segment[]): string {
+  const out: string[] = []
+  let actual: string | null = null
+  for (const s of ordered) {
+    if (s.act && s.act !== actual) out.push(`# ${tituloActividad(s.act)}`)
+    actual = s.act
+    out.push(s.text.trim())
+  }
+  return out.join('\n\n')
 }

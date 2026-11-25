@@ -3,233 +3,442 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AlgeTra · Entorno del agente</title>
+<title>AlgeTra</title>
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --line:#dfe3ea; --ink:#1d2330; --mut:#667085; --acc:#1f4e9c; --ok:#1e8449; --warn:#b9770e; --bad:#c0392b; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-  header { display:flex; align-items:center; gap:12px; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-  header h1 { font-size:17px; margin:0; flex:1; }
-  button, .btn { font:inherit; padding:6px 12px; border:1px solid var(--line); background:#fff; border-radius:7px; cursor:pointer; color:var(--ink); text-decoration:none; display:inline-block; }
-  button:hover, .btn:hover { border-color:var(--acc); }
-  button.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
-  button:disabled { opacity:.5; cursor:default; }
-  main { padding:16px 20px 40px; max-width:1500px; margin:0 auto; }
-  section { margin-bottom:22px; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--mut); margin:0 0 8px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
-  .upload { display:grid; grid-template-columns:260px 1fr; gap:14px; align-items:stretch; }
-  .drop { border:2px dashed #b9c2d3; border-radius:10px; padding:18px; text-align:center; color:var(--mut); cursor:pointer; background:#fafbfd; }
-  .drop.over { border-color:var(--acc); background:#eef3fb; }
-  label { display:block; font-size:12px; color:var(--mut); margin-bottom:3px; }
-  input[type=text] { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font:inherit; }
-  .board { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; align-items:start; }
-  .col { background:#eceff4; border-radius:10px; padding:8px; min-height:80px; }
-  .col h3 { font-size:13px; margin:2px 4px 8px; display:flex; justify-content:space-between; }
-  .item { background:#fff; border:1px solid var(--line); border-radius:8px; padding:7px; margin-bottom:7px; cursor:pointer; display:flex; gap:8px; }
-  .item:hover { border-color:var(--acc); }
-  .item.sel { outline:2px solid var(--acc); }
-  .item img { width:42px; height:56px; object-fit:cover; border-radius:4px; background:#e5e8ee; flex:none; }
-  .item .t { min-width:0; flex:1; }
-  .item .n { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:#e7ebf3; color:#41506b; margin:2px 3px 0 0; }
-  .tag.ok { background:#dff3e6; color:#17653a; } .tag.warn { background:#fdf0d5; color:#8a5a06; } .tag.bad { background:#fadbd8; color:#922b21; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { font-size:12px; color:var(--mut); font-weight:600; }
-  .detail { display:none; }
-  .detail.show { display:block; }
-  .tabs { display:flex; gap:6px; margin:8px 0; flex-wrap:wrap; }
-  .tabs button.on { background:var(--acc); color:#fff; border-color:var(--acc); }
-  .view { background:#fff; border:1px solid var(--line); border-radius:8px; min-height:200px; }
+  :root { --bg:#fafaf9; --card:#fff; --line:#e7e5e4; --ink:#1c1917; --mut:#78716c; --acc:#2f5fb3; --ok:#2f9e63; --warn:#d99a1e; --bad:#c2410c; --r:12px; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  header { display:flex; align-items:center; gap:6px; max-width:920px; margin:0 auto; padding:22px 20px 8px; }
+  header h1 { font-size:18px; font-weight:650; letter-spacing:-.01em; margin:0; flex:1; }
+  main { max-width:920px; margin:0 auto; padding:8px 20px 80px; }
+  h2 { font-size:15px; font-weight:600; margin:0 0 12px; }
+  .muted { color:var(--mut); } .small { font-size:13px; }
+  a { color:var(--acc); }
+  button, .btn { font:inherit; font-size:14px; padding:7px 14px; border:1px solid var(--line); background:var(--card); border-radius:9px; cursor:pointer; color:var(--ink); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:border-color .12s, background .12s; }
+  button:hover, .btn:hover { border-color:#c7c3be; }
+  button.primary, .btn.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+  button.primary:hover, .btn.primary:hover { background:#000; }
+  button.ghost, .btn.ghost { border-color:transparent; background:transparent; color:var(--mut); padding:7px 8px; }
+  button.ghost:hover, .btn.ghost:hover { color:var(--ink); border-color:transparent; }
+  button:disabled { opacity:.45; cursor:default; }
+  input[type=text], input[type=number], select { width:100%; font:inherit; font-size:14px; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
+  input:focus, select:focus, textarea:focus { outline:2px solid #cddcf5; border-color:var(--acc); }
+  input[type=color] { width:100%; height:36px; padding:2px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+  label { display:block; font-size:13px; color:var(--mut); margin-bottom:4px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--r); }
+  .banner { padding:10px 14px; border-radius:var(--r); margin-bottom:16px; background:#fef3c7; color:#78510a; font-size:14px; }
+
+  /* Subir */
+  .drop { border:1.5px dashed #d6d3d1; border-radius:var(--r); padding:34px 20px; text-align:center; cursor:pointer; background:var(--card); transition:border-color .12s, background .12s; }
+  .drop:hover, .drop.over { border-color:var(--acc); background:#f5f8fe; }
+  .drop b { font-weight:600; display:block; font-size:16px; }
+  .drop span { color:var(--mut); font-size:13px; }
+  .up-row { display:flex; gap:10px; align-items:center; margin:10px 0 0; }
+  .up-row input { max-width:300px; }
+  .msg { margin-top:10px; font-size:13px; } .msg .w { color:var(--bad); }
+
+  /* Entregas */
+  .list { display:flex; flex-direction:column; gap:10px; margin-top:28px; }
+  .row-card { display:flex; align-items:center; gap:16px; padding:14px 16px; cursor:pointer; }
+  .row-card:hover { border-color:#c7c3be; }
+  .row-card .t { flex:1; min-width:0; }
+  .row-card .n { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar { height:5px; border-radius:3px; background:#eeece9; overflow:hidden; display:flex; margin:7px 0 4px; }
+  .bar i { display:block; height:100%; } .bar .g { background:var(--ok); } .bar .a { background:var(--warn); } .bar .b { background:#93b3e6; }
+  .acts { display:flex; gap:6px; align-items:center; flex:none; }
+  .empty { text-align:center; padding:40px 0; color:var(--mut); }
+
+  /* Cabecera de vista */
+  .back { margin:0 0 6px -8px; }
+  .vhead { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+  .vhead .t { flex:1; min-width:0; }
+  .vhead h2 { font-size:20px; margin:0; letter-spacing:-.01em; overflow-wrap:anywhere; }
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:16px; overflow-x:auto; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:none; color:var(--mut); padding:9px 12px; margin-bottom:-1px; white-space:nowrap; }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+
+  /* Hojas */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:12px; }
+  .thumb { cursor:pointer; position:relative; }
+  .thumb img { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:9px; border:1px solid var(--line); background:#eeece9; display:block; }
+  .thumb:hover img { border-color:#a8a29e; }
+  .thumb .l { font-size:12px; color:var(--mut); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dot { position:absolute; top:7px; right:7px; width:11px; height:11px; border-radius:50%; border:2px solid #fff; background:#a8a29e; }
+  .dot.procesadas { background:var(--ok); } .dot.revision { background:var(--warn); } .dot.en_proceso { background:var(--acc); animation:pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .legend { display:flex; gap:14px; font-size:12.5px; color:var(--mut); margin:0 0 12px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; background:#a8a29e; }
+  .legend .procesadas { background:var(--ok); } .legend .revision { background:var(--warn); } .legend .en_proceso { background:var(--acc); }
+
+  /* Vistas */
+  .view { background:var(--card); border:1px solid var(--line); border-radius:var(--r); min-height:200px; overflow:hidden; }
   .view img { max-width:100%; display:block; margin:0 auto; }
   .view iframe { width:100%; height:78vh; border:0; }
-  pre { margin:0; padding:12px; white-space:pre-wrap; word-break:break-word; font:12.5px/1.5 ui-monospace, Consolas, monospace; max-height:78vh; overflow:auto; }
-  .muted { color:var(--mut); } .small { font-size:12px; }
-  .banner { padding:8px 12px; border-radius:8px; margin-bottom:10px; background:#fdf0d5; color:#6b4505; }
-  .msg { margin-top:8px; font-size:13px; } .msg .w { color:var(--warn); }
-  @media (max-width: 1000px) { .board { grid-template-columns:1fr 1fr; } .upload { grid-template-columns:1fr; } }
+  .pad { padding:16px; }
+  textarea.ed { width:100%; height:58vh; font:13px/1.55 ui-monospace, Consolas, monospace; padding:12px; border:1px solid var(--line); border-radius:9px; resize:vertical; }
+  .lint-e { color:var(--bad); } .lint-w { color:#9a6b0a; }
+  .note { font-size:13px; color:var(--mut); margin:10px 0 0; }
+  ul.clean { margin:6px 0 0; padding-left:18px; } ul.clean li { margin:2px 0; }
+
+  /* Estilo */
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { padding:6px 14px; border-radius:20px; }
+  .chip.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .fields { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:12px 14px; margin-top:14px; }
+  .fields .full { grid-column:1/-1; font-size:13px; color:var(--mut); margin:8px 0 -4px; font-weight:600; }
+  .fields label.chk { display:flex; align-items:center; gap:8px; color:var(--ink); font-size:14px; margin:0; padding-top:22px; }
+  details { margin-top:14px; } summary { cursor:pointer; color:var(--mut); font-size:14px; padding:4px 0; } summary:hover { color:var(--ink); }
+  .foot { display:flex; align-items:center; gap:12px; margin-top:18px; }
+  @media (max-width:640px) { .row-card { flex-wrap:wrap; } .acts { width:100%; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>AlgeTra · Entorno del agente</h1>
-  <span class="muted small" id="sync">…</span>
-  <button id="btnPrompt" title="Texto para pegar en tu herramienta de agentes">Copiar prompt de inicio</button>
+  <h1>AlgeTra</h1>
+  <button class="ghost" id="btnPrompt" title="Una hoja y se detiene">Prompt: una hoja</button>
+  <button class="ghost" id="btnLote" title="Hasta 5 hojas seguidas y reporta una tabla">Prompt: lote</button>
+  <button class="ghost" id="btnOrq" title="Un solo agente que reparte hojas a 3 subagentes en paralelo">Prompt: orquestador</button>
 </header>
 <main>
   <div id="tools"></div>
 
-  <section>
-    <h2>Subir hojas</h2>
-    <div class="card upload">
-      <div>
-        <label for="entrega">Nombre de la entrega (una por alumno/actividad)</label>
-        <input type="text" id="entrega" placeholder="p. ej. act03_alumnoA">
-        <p class="muted small" style="margin:8px 0 0">Las hojas con el mismo nombre se ensamblan juntas, ordenadas por ejercicio e inciso.</p>
-      </div>
-      <div>
-        <div class="drop" id="drop">Arrastra aquí fotos, PDF o DOCX — o haz clic para elegir<br><span class="small">Todo se convierte a imágenes. JPG · PNG · WebP · HEIC · PDF · DOCX</span></div>
-        <input type="file" id="file" multiple hidden accept="image/*,.pdf,.docx,.doc,.odt,.rtf,.heic,.heif">
-        <div class="msg" id="upmsg"></div>
-      </div>
-    </div>
-  </section>
+  <!-- Lista -->
+  <div id="vLista">
+    <div class="drop" id="drop"><b>Suelta aquí un ZIP, PDF o fotos</b><span>o haz clic para elegir · ZIP, PDF, DOCX, JPG, PNG, HEIC</span></div>
+    <input type="file" id="file" multiple hidden accept="image/*,.pdf,.docx,.doc,.odt,.rtf,.heic,.heif,.zip,application/zip">
+    <div class="up-row"><input type="text" id="entrega" placeholder="Nombre de la entrega (opcional)" aria-label="Nombre de la entrega"></div>
+    <div class="msg" id="upmsg"></div>
+    <div class="list" id="entregas"></div>
+  </div>
 
-  <section>
-    <h2>Cola</h2>
-    <div class="board" id="board"></div>
-  </section>
+  <!-- Entrega -->
+  <div id="vEntrega" hidden>
+    <button class="ghost back" data-back>← Entregas</button>
+    <div class="vhead"><div class="t"><h2 id="eTitulo"></h2><div id="eResumen" class="muted small"></div></div><div class="acts" id="eAcciones"></div></div>
+    <div class="tabs" id="eTabs"></div>
+    <div id="eCuerpo"></div>
+  </div>
 
-  <section>
-    <h2>Entregas</h2>
-    <div class="card" id="entregas"><span class="muted">Aún no hay entregas.</span></div>
-  </section>
-
-  <section class="detail" id="detail">
-    <h2 id="dtitle">Detalle</h2>
-    <div class="card">
-      <div class="row" id="dactions"></div>
-      <div class="tabs" id="dtabs"></div>
-      <div class="view" id="dview"></div>
-      <p class="muted small" id="dnote"></p>
-    </div>
-  </section>
+  <!-- Hoja -->
+  <div id="vHoja" hidden>
+    <button class="ghost back" data-back>← Volver</button>
+    <div class="vhead"><div class="t"><h2 id="hTitulo"></h2><div id="hResumen" class="muted small"></div></div><div class="acts" id="hAcciones"></div></div>
+    <div class="tabs" id="hTabs"></div>
+    <div id="hCuerpo"></div>
+  </div>
 </main>
 
 <script>
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
 const q = (o) => new URLSearchParams(o).toString()
-const COLS = [['por_procesar','Por procesar'],['en_proceso','En proceso'],['procesadas','Procesadas'],['revision','Revisión']]
-let state = { hojas: [], entregas: [] }
-let sel = null // {kind:'hoja', estado, id} | {kind:'entrega', nombre}
-let tab = null
+const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+const ESTADO = { por_procesar: 'Por procesar', en_proceso: 'En proceso', procesadas: 'Lista', revision: 'Por revisar' }
 
-const now = new Date(); const pad = (n) => String(n).padStart(2, '0')
-$('#entrega').value = `entrega-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+let state = { hojas: [], entregas: [], herramientas: {} }
+let view = { t: 'lista' } // {t:'entrega', nombre, tab} | {t:'hoja', estado, id, tab, de}
+let firma = ''
 
-async function refresh() {
-  try {
-    state = await (await fetch('/api/estado')).json()
-    $('#sync').textContent = 'actualizado ' + new Date().toLocaleTimeString()
-    render()
-  } catch { $('#sync').textContent = 'sin conexión con el servidor' }
+// ───────── Datos ─────────
+async function refresh(force) {
+  try { state = await (await fetch('/api/estado')).json() } catch { return }
+  const f = JSON.stringify([state.hojas, state.entregas, state.herramientas])
+  if (f === firma && !force) return
+  firma = f
+  pintarHerramientas()
+  if (view.t === 'lista') pintarLista()
+  else if (view.t === 'entrega') pintarEntrega(false)
+  else if (view.t === 'hoja') pintarHojaCabecera()
+}
+const hojasDe = (nombre) => state.hojas.filter((h) => h.entrega === nombre).sort((a, b) => (a.estado === 'por_procesar') - (b.estado === 'por_procesar') || a.id.localeCompare(b.id, 'es', { numeric: true }))
+const conteo = (hs) => ({ total: hs.length, porProcesar: hs.filter((h) => h.estado === 'por_procesar').length, enProceso: hs.filter((h) => h.estado === 'en_proceso').length, lista: hs.filter((h) => h.estado === 'procesadas').length, revision: hs.filter((h) => h.estado === 'revision' && !h.aprobada).length, aprobadas: hs.filter((h) => h.estado === 'revision' && h.aprobada).length })
+const entregaInfo = (n) => state.entregas.find((e) => e.nombre === n)
+
+function pintarHerramientas() {
+  const t = state.herramientas || {}
+  const falta = Object.entries(t).filter(([, v]) => !v).map(([k]) => k)
+  $('#tools').innerHTML = falta.length ? `<div class="banner">Faltan herramientas del sistema: <b>${falta.join(', ')}</b>.${t.soffice === false ? ' Sin LibreOffice no hay vista PDF ni DOCX de entrada.' : ''}${t.pdftoppm === false ? ' Sin pdftoppm no se aceptan PDF.' : ''}</div>` : ''
 }
 
-function badges(h) {
-  const out = []
-  const c = h.calidad
-  if (c) out.push(`<span class="tag ${c.nivel === 'ok' ? 'ok' : c.nivel === 'mala' ? 'bad' : 'warn'}" title="nitidez ${c.nitidez} · brillo ${c.brillo}">${c.nivel === 'ok' ? 'imagen ok' : esc(c.banderas.join(', ').replace(/_/g, ' '))}</span>`)
-  if (h.estado === 'revision' && !h.aprobada) out.push(`<span class="tag warn">necesita revisión</span>`)
-  if (h.dudas) out.push(`<span class="tag warn">${h.dudas} duda(s)</span>`)
-  if (h.aritmetica && h.aritmetica.verificadas) out.push(`<span class="tag ok">${h.aritmetica.verificadas} verif.</span>`)
-  if (h.aprobada) out.push(`<span class="tag ok">aprobada</span>`)
-  if (h.ejercicios?.length) out.push(`<span class="tag">${esc(h.ejercicios.join(', '))}</span>`)
-  return out.join('')
+function barra(c) {
+  const p = (n) => (c.total ? (n / c.total) * 100 : 0)
+  return `<div class="bar"><i class="g" style="width:${p(c.lista + c.aprobadas)}%"></i><i class="a" style="width:${p(c.revision)}%"></i><i class="b" style="width:${p(c.enProceso)}%"></i></div>`
+}
+function resumen(c) {
+  const partes = []
+  if (c.porProcesar) partes.push(`${c.porProcesar} por procesar`)
+  if (c.enProceso) partes.push(`${c.enProceso} en proceso`)
+  if (c.revision) partes.push(`${c.revision} por revisar`)
+  const hechas = c.lista + c.aprobadas + c.revision
+  return `${hechas} de ${c.total} hojas listas` + (partes.length ? ' · ' + partes.join(' · ') : '')
 }
 
-function render() {
-  const tools = state.herramientas || {}
-  const missing = Object.entries(tools).filter(([, v]) => !v).map(([k]) => k)
-  $('#tools').innerHTML = missing.length ? `<div class="banner">Faltan herramientas del sistema: <b>${missing.join(', ')}</b>. ${tools.soffice === false ? 'Sin LibreOffice no hay PDF ni se aceptan DOCX. ' : ''}${tools.pdftoppm === false ? 'Sin pdftoppm no se aceptan PDF. ' : ''}${tools.magick === false ? 'Sin ImageMagick no hay análisis de calidad.' : ''}</div>` : ''
-  $('#board').innerHTML = COLS.map(([k, label]) => {
-    const hs = state.hojas.filter((h) => h.estado === k)
-    return `<div class="col"><h3><span>${label}</span><span class="muted">${hs.length}</span></h3>` + (hs.map((h) => {
-      const on = sel && sel.kind === 'hoja' && sel.estado === h.estado && sel.id === h.id
-      const img = `/api/archivo?${q({ estado: h.estado, id: h.id, tipo: 'imagen' })}`
-      return `<div class="item ${on ? 'sel' : ''}" data-e="${esc(h.estado)}" data-id="${esc(h.id)}"><img loading="lazy" src="${img}" alt=""><div class="t"><div class="n" title="${esc(h.id)}">${esc(h.archivo)}</div>${h.entrega ? `<span class="tag">${esc(h.entrega)}${h.orden ? ' · h' + h.orden : ''}</span>` : ''}<div>${badges(h)}</div></div></div>`
-    }).join('') || '<div class="muted small" style="padding:6px">vacío</div>') + '</div>'
-  }).join('')
-  document.querySelectorAll('.item').forEach((el) => el.onclick = () => selectHoja(el.dataset.e, el.dataset.id))
-
-  if (!state.entregas.length) $('#entregas').innerHTML = '<span class="muted">Aún no hay entregas. Sube hojas con un nombre de entrega.</span>'
-  else $('#entregas').innerHTML = `<table><thead><tr><th>Entrega</th><th>Hojas</th><th>Ensamblado</th><th></th></tr></thead><tbody>` + state.entregas.map((e) => {
-    const c = e.conteo, ens = e.ensamblado
-    const cerradas = c.procesadas + c.revision
-    return `<tr><td><b>${esc(e.nombre)}</b></td><td class="small">por procesar ${c.por_procesar} · en proceso ${c.en_proceso} · <b>cerradas ${cerradas}</b> (revisión ${c.revision})</td>
-      <td class="small">${ens ? `${ens.hojas} hoja(s) · ${ens.formulas} fórmulas${ens.faltantes?.length ? `<br><span class="tag warn">faltan: ${esc(ens.faltantes.join(', '))}</span>` : ''}${ens.fallos?.length ? `<br><span class="tag bad">${ens.fallos.length} fallo(s) de conversión</span>` : ''}${ens.pendientes && (ens.pendientes.por_procesar + ens.pendientes.en_proceso) ? `<br><span class="tag warn">quedaban pendientes al ensamblar</span>` : ''}` : '<span class="muted">sin ensamblar</span>'}</td>
-      <td style="white-space:nowrap"><button data-ens="${esc(e.nombre)}" ${cerradas ? '' : 'disabled'}>${ens ? 'Reensamblar' : 'Ensamblar'}</button>
-      ${e.tieneDocx ? `<button data-ver="${esc(e.nombre)}">Ver</button> <a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'docx', descargar: 1 })}">DOCX</a> <a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'pdf', descargar: 1 })}">PDF</a>` : ''}</td></tr>`
-  }).join('') + '</tbody></table>'
-  document.querySelectorAll('[data-ens]').forEach((b) => b.onclick = () => ensamblar(b.dataset.ens, b))
-  document.querySelectorAll('[data-ver]').forEach((b) => b.onclick = () => selectEntrega(b.dataset.ver))
+// ───────── Lista de entregas ─────────
+function pintarLista() {
+  const sueltas = hojasDe('')
+  const tarjetas = []
+  if (sueltas.length) {
+    const c = conteo(sueltas)
+    tarjetas.push(`<div class="card row-card" data-ent=""><div class="t"><div class="n">${c.total} hojas sin entrega</div><div class="small muted">Para obtener un solo documento con todas, ponlas en una entrega.</div></div><div class="acts"><button class="primary" data-ent="">Crear entrega con estas hojas</button></div></div>`)
+  }
+  for (const e of state.entregas) {
+    const c = conteo(hojasDe(e.nombre))
+    const cerradas = c.lista + c.aprobadas + c.revision
+    tarjetas.push(`<div class="card row-card" data-ent="${esc(e.nombre)}"><div class="t"><div class="n">${esc(e.nombre)}</div>${barra(c)}<div class="small muted">${resumen(c)}</div></div>
+      <div class="acts">${e.tieneDocx ? `<a class="btn" href="/api/entrega?${q({ nombre: e.nombre, tipo: 'docx', descargar: 1 })}" data-stop>DOCX</a>` : cerradas ? `<button data-ens="${esc(e.nombre)}">Ensamblar</button>` : ''}</div></div>`)
+  }
+  $('#entregas').innerHTML = tarjetas.join('') || '<div class="empty">Aún no hay entregas. Sube tu primer ZIP.</div>'
+  document.querySelectorAll('#entregas [data-ent]').forEach((el) => el.onclick = () => abrirEntrega(el.dataset.ent))
+  document.querySelectorAll('#entregas [data-stop]').forEach((el) => el.onclick = (ev) => ev.stopPropagation())
+  document.querySelectorAll('#entregas [data-ens]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); ensamblar(b.dataset.ens, b) })
 }
 
 async function ensamblar(nombre, btn) {
-  btn.disabled = true; btn.textContent = 'Ensamblando…'
-  const r = await fetch('/api/ensamblar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entrega: nombre }) })
-  const j = await r.json()
-  if (!r.ok) alert(j.message || 'No se pudo ensamblar');
-  await refresh(); if (r.ok) selectEntrega(nombre)
+  if (btn) { btn.disabled = true; btn.textContent = 'Ensamblando…' }
+  const r = await post('/api/ensamblar', { entrega: nombre })
+  if (!r.ok) alert((await r.json()).message || 'No se pudo ensamblar')
+  await refresh(true)
+  if (r.ok && view.t === 'entrega') abrirEntrega(nombre, 'documento')
 }
 
-function selectHoja(estado, id) {
-  sel = { kind: 'hoja', estado, id }; tab = estado === 'por_procesar' ? 'imagen' : (estado === 'en_proceso' ? 'imagen' : 'pdf')
-  showDetail(); render()
+// ───────── Navegación ─────────
+function mostrar(v) {
+  $('#vLista').hidden = v !== 'lista'; $('#vEntrega').hidden = v !== 'entrega'; $('#vHoja').hidden = v !== 'hoja'
+  window.scrollTo({ top: 0 })
 }
-function selectEntrega(nombre) { sel = { kind: 'entrega', nombre }; tab = 'pdf'; showDetail(); render() }
+function irLista() { view = { t: 'lista' }; mostrar('lista'); firma = ''; refresh(true) }
+document.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => { if (view.t === 'hoja' && view.de !== undefined) abrirEntrega(view.de, view.deTab || 'hojas'); else irLista() })
 
-function showDetail() {
-  $('#detail').classList.add('show')
-  const v = $('#dview'), tabs = $('#dtabs'), act = $('#dactions')
-  let defs = []
-  if (sel.kind === 'hoja') {
-    const h = state.hojas.find((x) => x.estado === sel.estado && x.id === sel.id) || {}
-    $('#dtitle').textContent = `${h.archivo || sel.id} · ${sel.estado.replace('_', ' ')}`
-    const u = (tipo, d) => `/api/archivo?${q({ estado: sel.estado, id: sel.id, tipo, ...(d ? { descargar: 1 } : {}) })}`
-    defs = [['imagen', 'Foto original', 'img', u('imagen')]]
-    if (sel.estado !== 'por_procesar') defs.push(['mejorada', 'Foto mejorada', 'img', u('mejorada')], ['md', 'Transcripción', 'txt', u('md')])
-    if (sel.estado === 'procesadas' || sel.estado === 'revision') defs.push(['pdf', 'Documento (PDF)', 'pdf', u('pdf')])
-    act.innerHTML = (sel.estado === 'procesadas' || sel.estado === 'revision')
-      ? `<a class="btn primary" href="${u('docx', 1)}">Descargar DOCX</a> <a class="btn" href="${u('pdf', 1)}">Descargar PDF</a> <a class="btn" href="${u('md', 1)}">Descargar MD</a>` : ''
-    $('#dnote').textContent = h.requierenRevision && h.requierenRevision.length ? 'Pendiente: ' + h.requierenRevision.join(' · ') : (sel.estado === 'procesadas' || sel.estado === 'revision' ? 'El PDF se genera con LibreOffice a partir del DOCX: las ecuaciones se ven parecidas, no idénticas, a Word.' : '')
-  } else {
-    $('#dtitle').textContent = `Entrega · ${sel.nombre}`
-    const u = (tipo, d) => `/api/entrega?${q({ nombre: sel.nombre, tipo, ...(d ? { descargar: 1 } : {}) })}`
-    defs = [['pdf', 'Documento ensamblado (PDF)', 'pdf', u('pdf')], ['md', 'Texto ensamblado', 'txt', u('md')], ['json', 'Orden y avisos', 'json', u('json')]]
-    act.innerHTML = `<a class="btn primary" href="${u('docx', 1)}">Descargar DOCX</a> <a class="btn" href="${u('pdf', 1)}">Descargar PDF</a>`
-    $('#dnote').textContent = 'Orden: actividad → ejercicio → inciso. Lo que el alumno escribió sin marca de ejercicio se queda con lo anterior.'
+function abrirEntrega(nombre, tab) {
+  const info = entregaInfo(nombre)
+  view = { t: 'entrega', nombre, tab: tab || (nombre === '' ? 'hojas' : info?.tieneDocx ? 'documento' : 'hojas') }
+  estiloCargado = null
+  mostrar('entrega'); pintarEntrega(true)
+}
+
+function pintarEntrega(completo) {
+  const nombre = view.nombre, info = entregaInfo(nombre), hs = hojasDe(nombre), c = conteo(hs)
+  $('#eTitulo').textContent = nombre === '' ? 'Hojas sin entrega' : nombre
+  $('#eResumen').textContent = resumen(c)
+  const cerradas = c.lista + c.aprobadas + c.revision
+  $('#eAcciones').innerHTML = nombre === '' ? '' :
+    (info?.tieneDocx ? `<a class="btn primary" href="/api/entrega?${q({ nombre, tipo: 'docx', descargar: 1 })}">Descargar DOCX</a><a class="btn" href="/api/entrega?${q({ nombre, tipo: 'pdf', descargar: 1 })}">PDF</a>` : '') +
+    `<button id="bEns" ${cerradas ? '' : 'disabled'}>${info?.ensamblado ? 'Reensamblar' : 'Ensamblar'}</button>`
+  if ($('#bEns')) $('#bEns').onclick = (ev) => ensamblar(nombre, ev.target)
+  const tabs = nombre === '' ? [['hojas', 'Hojas']] : [['documento', 'Documento'], ['hojas', 'Hojas'], ['estilo', 'Estilo'], ['avisos', 'Avisos']]
+  $('#eTabs').innerHTML = tabs.map(([k, l]) => `<button data-t="${k}" class="${k === view.tab ? 'on' : ''}">${l}</button>`).join('')
+  $('#eTabs').querySelectorAll('button').forEach((b) => b.onclick = () => { view.tab = b.dataset.t; estiloCargado = null; pintarEntrega(true) })
+  const cuerpo = $('#eCuerpo')
+  if (view.tab === 'hojas') pintarHojas(cuerpo, nombre, hs)
+  else if (!completo) return // las demás pestañas no se redibujan con el sondeo (se perdería lo que escribes)
+  else if (view.tab === 'documento') {
+    if (!info?.tieneDocx) cuerpo.innerHTML = `<div class="empty">Todavía no hay documento.<br>${cerradas ? 'Pulsa «Ensamblar».' : 'Se genera solo cuando el agente cierra la última hoja.'}</div>`
+    else { cuerpo.innerHTML = `<div class="view"><div class="pad muted">Generando vista…</div></div>`; const f = document.createElement('iframe'); f.src = `/api/entrega?${q({ nombre, tipo: 'pdf' })}&t=${Date.now()}`; f.onload = () => cuerpo.querySelector('.pad')?.remove(); cuerpo.firstChild.appendChild(f) }
+  } else if (view.tab === 'estilo') pintarEstilo(cuerpo, nombre)
+  else if (view.tab === 'avisos') pintarAvisos(cuerpo, info)
+}
+
+function pintarHojas(cuerpo, nombre, hs) {
+  const abierto = cuerpo.querySelector('.grid')
+  const agrupar = nombre === '' && hs.length ? `<div class="card pad" style="margin-bottom:16px"><label for="agNombre">Nombre de la entrega (el documento final se llamará así)</label><div class="up-row" style="margin:0"><input type="text" id="agNombre" value="${esc(sugerirNombre())}"><button class="primary" id="agBtn">Crear entrega con ${hs.length} hojas</button></div></div>` : ''
+  cuerpo.innerHTML = agrupar + (hs.length ? `<div class="legend"><span><i></i>por procesar</span><span><i class="en_proceso"></i>en proceso</span><span><i class="procesadas"></i>lista</span><span><i class="revision"></i>por revisar</span></div>` : '') +
+    `<div class="grid">` + (hs.map((h) => `<div class="thumb" data-e="${esc(h.estado)}" data-id="${esc(h.id)}" title="${esc(ESTADO[h.estado])}${h.calidad && h.calidad.nivel !== 'ok' ? ' · ' + esc(h.calidad.banderas.join(', ').replace(/_/g, ' ')) : ''}"><img loading="lazy" src="/api/archivo?${q({ estado: h.estado, id: h.id, tipo: 'imagen', mini: 1 })}" alt=""><span class="dot ${h.estado === 'revision' && h.aprobada ? 'procesadas' : h.estado}"></span><div class="l">${esc(h.archivo.replace(/\.[^.]+$/, ''))}</div></div>`).join('') || '<div class="empty" style="grid-column:1/-1">Sin hojas.</div>') + `</div>`
+  cuerpo.querySelectorAll('.thumb').forEach((el) => el.onclick = () => abrirHoja(el.dataset.e, el.dataset.id, nombre, view.tab))
+  if ($('#agBtn')) $('#agBtn').onclick = async () => {
+    const nuevo = $('#agNombre').value.trim(); $('#agBtn').disabled = true
+    const r = await post('/api/agrupar', { entrega: nuevo }); const j = await r.json()
+    if (!r.ok) { alert(j.message || 'No se pudo agrupar'); $('#agBtn').disabled = false; return }
+    await refresh(true); abrirEntrega(j.entrega, 'hojas')
   }
-  if (!defs.find((d) => d[0] === tab)) tab = defs[0][0]
-  tabs.innerHTML = defs.map((d) => `<button data-t="${d[0]}" class="${d[0] === tab ? 'on' : ''}">${d[1]}</button>`).join('')
-  tabs.querySelectorAll('button').forEach((b) => b.onclick = () => { tab = b.dataset.t; showDetail() })
-  const d = defs.find((x) => x[0] === tab)
-  const bust = (d[3].includes('?') ? '&' : '?') + 't=' + Date.now()
-  if (d[2] === 'img') v.innerHTML = `<img src="${d[3]}${bust}" alt="">`
-  else if (d[2] === 'pdf') { v.innerHTML = `<div class="muted" style="padding:14px">Generando PDF…</div>`; const f = document.createElement('iframe'); f.src = d[3] + bust; f.onload = () => v.firstChild && v.firstChild.remove(); v.appendChild(f) }
-  else fetch(d[3] + bust).then((r) => r.ok ? r.text() : r.json().then((j) => j.message || 'No disponible')).then((t) => { v.innerHTML = `<pre>${esc(d[2] === 'json' ? JSON.stringify(JSON.parse(t), null, 2) : t)}</pre>` }).catch(() => { v.innerHTML = '<pre>No disponible todavía.</pre>' })
-  $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+const sugerirNombre = () => { const n = new Date(), p = (x) => String(x).padStart(2, '0'); return `entrega-${n.getFullYear()}${p(n.getMonth() + 1)}${p(n.getDate())}` }
+
+function pintarAvisos(cuerpo, info) {
+  const e = info?.ensamblado
+  if (!e) { cuerpo.innerHTML = '<div class="empty">Aún no hay ensamblado, así que no hay avisos.</div>'; return }
+  const sec = (titulo, items, cls) => items?.length ? `<h2 style="margin-top:18px">${titulo}</h2><ul class="clean ${cls || ''}">${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''
+  const orden = [...new Set((e.orden || []).map((o) => o.ej.split('/')[0]))]
+  cuerpo.innerHTML = `<div class="card pad"><div class="small muted">${e.hojas} hojas · ${e.formulas} fórmulas · orden: ${orden.map((a) => esc(a.replace('act-', 'Act. '))).join(' → ') || '—'}</div>` +
+    sec('Por revisar', e.requierenRevision, 'lint-w') + sec('Ejercicios de la base que no aparecen', e.faltantes) + sec('Fórmulas que no se pudieron convertir', (e.fallos || []).map((f) => `${f.latex} — ${f.error}`), 'lint-e') +
+    (e.pendientes && e.pendientes.por_procesar + e.pendientes.en_proceso ? `<p class="note">Al ensamblar faltaban hojas por procesar.</p>` : '') +
+    (!e.requierenRevision?.length && !e.faltantes?.length && !e.fallos?.length ? '<p style="margin:14px 0 0">Sin avisos.</p>' : '') + `</div>`
 }
 
-// Subida
+// ───────── Hoja ─────────
+function abrirHoja(estado, id, de, deTab) {
+  view = { t: 'hoja', estado, id, de, deTab, tab: estado === 'procesadas' || estado === 'revision' ? 'documento' : 'foto' }
+  mostrar('hoja'); pintarHoja()
+}
+function hojaActual() { return state.hojas.find((x) => x.estado === view.estado && x.id === view.id) || {} }
+function pintarHojaCabecera() {
+  const h = hojaActual()
+  $('#hTitulo').textContent = h.archivo || view.id
+  const aviso = (h.requierenRevision || []).concat(h.dudas ? [`${h.dudas} duda(s) del agente`] : [])
+  $('#hResumen').textContent = ESTADO[h.estado] + (h.calidad && h.calidad.nivel !== 'ok' ? ' · foto: ' + h.calidad.banderas.join(', ').replace(/_/g, ' ') : '') + (aviso.length && !h.aprobada ? ' · ' + aviso.join(' · ') : '') + (h.aprobada ? ' · aprobada' : '')
+  const u = (tipo, d) => `/api/archivo?${q({ estado: view.estado, id: view.id, tipo, ...(d ? { descargar: 1 } : {}) })}`
+  $('#hAcciones').innerHTML = view.estado === 'procesadas' || view.estado === 'revision' ? `<a class="btn primary" href="${u('docx', 1)}">DOCX</a><a class="btn" href="${u('md', 1)}">Texto</a>` : ''
+}
+function pintarHoja() {
+  pintarHojaCabecera()
+  const cerrada = view.estado === 'procesadas' || view.estado === 'revision'
+  const tabs = [['foto', 'Foto']]
+  if (view.estado !== 'por_procesar') tabs.push(['mejorada', 'Mejorada'], ['texto', cerrada ? 'Editar transcripción' : 'Transcripción'])
+  if (cerrada) tabs.unshift(['documento', 'Documento'])
+  if (!tabs.find((t) => t[0] === view.tab)) view.tab = tabs[0][0]
+  $('#hTabs').innerHTML = tabs.map(([k, l]) => `<button data-t="${k}" class="${k === view.tab ? 'on' : ''}">${l}</button>`).join('')
+  $('#hTabs').querySelectorAll('button').forEach((b) => b.onclick = () => { view.tab = b.dataset.t; pintarHoja() })
+  const v = $('#hCuerpo'), u = (tipo) => `/api/archivo?${q({ estado: view.estado, id: view.id, tipo })}&t=${Date.now()}`
+  if (view.tab === 'foto' || view.tab === 'mejorada') v.innerHTML = `<div class="view"><img src="${u(view.tab === 'foto' ? 'imagen' : 'mejorada')}" alt=""></div>`
+  else if (view.tab === 'documento') { v.innerHTML = `<div class="view"><div class="pad muted">Generando vista…</div></div>`; const f = document.createElement('iframe'); f.src = u('pdf'); f.onload = () => v.querySelector('.pad')?.remove(); v.firstChild.appendChild(f) }
+  else if (cerrada) pintarEditor(v)
+  else fetch(u('md')).then((r) => r.ok ? r.text() : '').then((t) => { v.innerHTML = `<div class="view"><div class="pad" style="white-space:pre-wrap;font:13px/1.55 ui-monospace,Consolas,monospace">${esc(t) || '<span class="muted">Aún no hay transcripción.</span>'}</div></div>` })
+}
+
+async function pintarEditor(v) {
+  const h = { estado: view.estado, id: view.id }
+  v.innerHTML = '<div class="pad muted">Cargando…</div>'
+  const texto = await (await fetch(`/api/archivo?${q({ ...h, tipo: 'md' })}&t=${Date.now()}`)).text()
+  v.innerHTML = `<textarea class="ed" id="ed" spellcheck="false"></textarea>
+    <div class="foot"><button class="primary" id="edSave">Guardar</button><button id="edApprove" title="Tu versión pasa a ser la referencia para medir al agente">Guardar y aprobar</button></div>
+    <p class="note">Las líneas <code>&lt;!-- … --&gt;</code> son notas del agente y no salen en el documento. Al guardar se rehacen los documentos; no se procesa nada de nuevo.</p><div class="msg" id="edMsg"></div>`
+  $('#ed').value = texto
+  const guardar = async (aprobar) => {
+    $('#edMsg').textContent = 'Guardando…'
+    const r = await fetch('/api/transcripcion', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...h, texto: $('#ed').value }) })
+    const j = await r.json()
+    if (!r.ok) { $('#edMsg').innerHTML = `<span class="lint-e">${esc(j.message || 'No se pudo guardar')}</span>`; return }
+    let html = 'Guardado.' + (j.lint.errors || []).map((e) => `<div class="lint-e">✘ ${esc(e)}</div>`).join('') + (j.lint.needsReview || []).map((e) => `<div class="lint-w">! ${esc(e)}</div>`).join('')
+    if (aprobar) {
+      const a = await post('/api/aprobar', h); const aj = await a.json()
+      html += a.ok ? `<div>Aprobada · fórmulas exactas ${aj.metricas.equations.exact}/${aj.metricas.equations.total} · ${aj.metricas.unchanged ? 'sin correcciones' : 'corregida'}</div>` : `<div class="lint-e">${esc(aj.message || 'No se pudo aprobar')}</div>`
+    }
+    $('#edMsg').innerHTML = html; refresh(true)
+  }
+  $('#edSave').onclick = () => guardar(false); $('#edApprove').onclick = () => guardar(true)
+}
+
+// ───────── Estilo ─────────
+let CAT = null, estiloActual = null, variante = 0, estiloCargado = null
+const F = ['fuente', 'tamano', 'interlineado', 'margenCm', 'papel', 'alinear', 'ecuaciones', 'espaciado', 'titulo']
+const G = ['paleta', 'grosor', 'cuadricula', 'ancho', 'etiquetas']
+const campo = (id, label, html) => `<div><label for="${id}">${label}</label>${html}</div>`
+const sel = (id, opts) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`
+
+async function pintarEstilo(cuerpo, nombre) {
+  CAT = CAT || await (await fetch('/api/estilos')).json()
+  cuerpo.innerHTML = `<div class="card pad">
+    <p class="muted small" style="margin:0 0 12px">Cambia solo la presentación. Lo transcrito no se toca y no se vuelve a procesar nada.</p>
+    <div class="chips" id="chips">${Object.keys(CAT.presets).map((k) => `<button class="chip" data-p="${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}<button class="chip" id="e_var" title="Propone un estilo distinto cada vez">Variar</button><label class="btn chip" style="margin:0;color:var(--ink)">Desde un ejemplo…<input type="file" id="e_ej" hidden accept=".docx,.pdf"></label></div>
+    <div id="e_info"></div>
+    <details><summary>Ajustes</summary><div class="fields">
+      ${campo('e_fuente', 'Tipografía', sel('e_fuente', CAT.fuentes.map((f) => [f, f])))}
+      ${campo('e_tamano', 'Tamaño (pt)', '<input type="number" id="e_tamano" step="0.5" min="10" max="14">')}
+      ${campo('e_interlineado', 'Interlineado', '<input type="number" id="e_interlineado" step="0.05" min="1" max="2">')}
+      ${campo('e_margenCm', 'Márgenes (cm)', '<input type="number" id="e_margenCm" step="0.1" min="1.5" max="3.5">')}
+      ${campo('e_papel', 'Papel', sel('e_papel', [['A4', 'A4'], ['Carta', 'Carta']]))}
+      ${campo('e_alinear', 'Texto', sel('e_alinear', [['izquierda', 'Izquierda'], ['justificado', 'Justificado']]))}
+      ${campo('e_ecuaciones', 'Ecuaciones', sel('e_ecuaciones', [['izquierda', 'A la izquierda'], ['centradas', 'Centradas']]))}
+      ${campo('e_espaciado', 'Espacio entre incisos', sel('e_espaciado', [['compacto', 'Compacto'], ['normal', 'Normal'], ['amplio', 'Amplio']]))}
+      ${campo('e_colorTitulos', 'Color de títulos', '<input type="color" id="e_colorTitulos">')}
+      ${campo('e_titulo', 'Título del documento', sel('e_titulo', [['ninguno', 'Ninguno'], ['entrega', 'Nombre de la entrega']]))}
+      <label class="chk"><input type="checkbox" id="e_numeracion"> Número de página</label>
+      <label class="chk"><input type="checkbox" id="e_saltoActividad"> Actividad en hoja nueva</label>
+      <div class="full">Gráficas</div>
+      ${campo('g_paleta', 'Paleta', sel('g_paleta', Object.entries(CAT.paletas).map(([k, p]) => [k, p.nombre])))}
+      ${campo('g_grosor', 'Grosor de línea', '<input type="number" id="g_grosor" step="0.1" min="1.5" max="4">')}
+      ${campo('g_cuadricula', 'Cuadrícula', sel('g_cuadricula', [['ninguna', 'Ninguna'], ['suave', 'Suave'], ['completa', 'Completa']]))}
+      ${campo('g_ancho', 'Ancho (%)', '<input type="number" id="g_ancho" step="1" min="30" max="100">')}
+      ${campo('g_etiquetas', 'Etiquetas', '<input type="number" id="g_etiquetas" step="1" min="11" max="20">')}
+    </div></details>
+    <div class="foot"><button class="primary" id="e_apply">Aplicar</button><span class="small muted" id="e_msg"></span></div></div>`
+  fillEstilo(await (await fetch(`/api/estilo?${q({ entrega: nombre })}`)).json())
+  variante = 0
+  cuerpo.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => { fillEstilo(CAT.presets[b.dataset.p]); $('#e_info').innerHTML = ''; $('#e_msg').textContent = '' })
+  cuerpo.querySelectorAll('details input, details select').forEach((el) => el.addEventListener('input', () => { estiloActual = { ...estiloActual, nombre: 'personalizado' }; delete estiloActual.semilla; marcarChip() }))
+  $('#e_var').onclick = async () => {
+    variante++
+    const r = await post('/api/estilo/variar', { entrega: nombre, semilla: variante === 1 ? nombre : `${nombre}#${variante}` })
+    fillEstilo(await r.json()); $('#e_info').innerHTML = ''; $('#e_msg').textContent = 'Propuesta lista. Pulsa Aplicar para usarla.'
+  }
+  $('#e_ej').onchange = async (ev) => {
+    const f = ev.target.files[0]; ev.target.value = ''
+    if (!f) return
+    $('#e_msg').textContent = 'Leyendo el ejemplo…'
+    const fd = new FormData(); fd.append('file', f, f.name)
+    const r = await fetch('/api/estilo/extraer', { method: 'POST', body: fd }); const j = await r.json()
+    if (!r.ok) { $('#e_msg').innerHTML = `<span class="lint-e">${esc(j.message || 'No se pudo leer')}</span>`; return }
+    fillEstilo(j.estilo)
+    $('#e_msg').textContent = 'Tomado del ejemplo. Revísalo y pulsa Aplicar.'
+    $('#e_info').innerHTML = `<details open><summary>Lo que se leyó de ${esc(f.name)}</summary><ul class="clean small">${j.detectado.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${j.incierto.length ? `<p class="note">No se pudo asegurar:</p><ul class="clean small muted">${j.incierto.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</details>`
+  }
+  $('#e_apply').onclick = async () => {
+    const b = $('#e_apply'); b.disabled = true; $('#e_msg').textContent = 'Aplicando…'
+    const r = await fetch('/api/estilo', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entrega: nombre, estilo: collectEstilo() }) })
+    const j = await r.json(); b.disabled = false
+    if (!r.ok) { $('#e_msg').textContent = j.message || 'No se pudo aplicar'; return }
+    fillEstilo(j.estilo)
+    await refresh(true)
+    if (j.ensamblado) { view.tab = 'documento'; pintarEntrega(true) } // se ve el resultado
+    else $('#e_msg').textContent = 'Guardado. Se usará al ensamblar la entrega.'
+  }
+}
+function marcarChip() { document.querySelectorAll('#chips [data-p]').forEach((b) => b.classList.toggle('on', estiloActual && estiloActual.nombre === b.dataset.p)) }
+function fillEstilo(e) {
+  estiloActual = e
+  F.forEach((k) => { $('#e_' + k).value = e[k] })
+  $('#e_colorTitulos').value = '#' + e.colorTitulos.toLowerCase()
+  $('#e_numeracion').checked = !!e.numeracion; $('#e_saltoActividad').checked = !!e.saltoActividad
+  G.forEach((k) => { $('#g_' + k).value = e.grafica[k] })
+  marcarChip()
+}
+function collectEstilo() {
+  const e = { nombre: estiloActual?.nombre || 'personalizado', grafica: {} }
+  if (estiloActual?.semilla) e.semilla = estiloActual.semilla
+  F.forEach((k) => { e[k] = $('#e_' + k).value })
+  e.colorTitulos = $('#e_colorTitulos').value.replace('#', '')
+  e.numeracion = $('#e_numeracion').checked; e.saltoActividad = $('#e_saltoActividad').checked
+  G.forEach((k) => { e.grafica[k] = $('#g_' + k).value })
+  return e
+}
+
+// ───────── Subir ─────────
+const pad2 = (n) => String(n).padStart(2, '0')
+const nombreAuto = () => { const n = new Date(); return `entrega-${n.getFullYear()}${pad2(n.getMonth() + 1)}${pad2(n.getDate())}-${pad2(n.getHours())}${pad2(n.getMinutes())}${pad2(n.getSeconds())}` }
 async function upload(files) {
   if (!files.length) return
+  let nombre = $('#entrega').value.trim()
+  const zips = files.filter((f) => /\.zip$/i.test(f.name))
+  if (!nombre) nombre = zips.length === 1 && zips.length === files.length ? zips[0].name.replace(/\.zip$/i, '') : nombreAuto()
   $('#upmsg').textContent = `Subiendo y convirtiendo ${files.length} archivo(s)…`
-  const fd = new FormData(); fd.append('entrega', $('#entrega').value.trim())
+  const fd = new FormData(); fd.append('entrega', nombre)
   for (const f of files) fd.append('files', f, f.name)
   try {
     const r = await fetch('/api/subir', { method: 'POST', body: fd }); const j = await r.json()
     if (!r.ok) { $('#upmsg').innerHTML = `<span class="w">${esc(j.message || 'Error al subir')}</span>`; return }
     const n = j.resultados.reduce((a, x) => a + x.guardadas.length, 0)
-    $('#upmsg').innerHTML = `${n} imagen(es) en la cola.` + j.resultados.flatMap((x) => x.avisos).map((a) => `<div class="w">⚠ ${esc(a)}</div>`).join('')
+    $('#upmsg').innerHTML = `${n} hoja(s) en «${esc(nombre)}».` + j.resultados.flatMap((x) => x.avisos).map((a) => `<div class="w">${esc(a)}</div>`).join('')
+    $('#entrega').value = ''
   } catch (e) { $('#upmsg').innerHTML = `<span class="w">No se pudo subir: ${esc(e.message)}</span>` }
-  refresh()
+  refresh(true)
 }
 const drop = $('#drop'), inp = $('#file')
 drop.onclick = () => inp.click()
 inp.onchange = () => { upload([...inp.files]); inp.value = '' }
-;['dragenter','dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over') }))
-;['dragleave','drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
+;['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over') }))
+;['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over') }))
 drop.addEventListener('drop', (e) => upload([...e.dataTransfer.files]))
 
-$('#btnPrompt').onclick = async () => {
-  const t = await (await fetch('/api/prompt')).text()
-  try { await navigator.clipboard.writeText(t); $('#btnPrompt').textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }
-  setTimeout(() => $('#btnPrompt').textContent = 'Copiar prompt de inicio', 1800)
+for (const [id, tipo, etiqueta] of [['#btnPrompt', '', 'Prompt: una hoja'], ['#btnLote', 'lote', 'Prompt: lote'], ['#btnOrq', 'orquestador', 'Prompt: orquestador']]) {
+  $(id).onclick = async () => {
+    const t = await (await fetch('/api/prompt' + (tipo ? '?tipo=' + tipo : ''))).text()
+    try { await navigator.clipboard.writeText(t); $(id).textContent = '¡Copiado!' } catch { prompt('Copia este texto:', t) }
+    setTimeout(() => $(id).textContent = etiqueta, 1800)
+  }
 }
 
-refresh(); setInterval(refresh, 4000)
+refresh(true); setInterval(() => refresh(false), 4000)
 </script>
 </body>
 </html>

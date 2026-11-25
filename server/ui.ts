@@ -5,11 +5,13 @@ import Fastify from 'fastify'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { D, ESTADOS, docxToPdf, ensamblar, ensureDirs, ingest, listHojas, ls, toolsAvailable, type Estado, type Hoja } from './workspace'
+import { FUENTES, LIMITES, PALETAS, PRESETS, variarEstilo } from '../src/shared/estilo'
+import { D, ESTADOS, agruparSueltas, aprobarHoja, docxToPdf, ensamblar, ensureDirs, guardarEstilo, guardarTranscripcion, ingest, leerEstilo, listHojas, ls, miniatura, regenerarEntrega, toolsAvailable, type Estado, type Hoja } from './workspace'
 import { safeId } from './harness'
+import { extraerFormato } from './formato'
 
 const app = Fastify({ logger: { level: 'warn' }, bodyLimit: 1024 * 1024 })
-await app.register(multipart, { limits: { fileSize: 80 * 1024 * 1024, files: 80 } })
+await app.register(multipart, { limits: { fileSize: 600 * 1024 * 1024, files: 200 } })
 await ensureDirs()
 
 const bad = (m: string, code = 400) => Object.assign(new Error(m), { statusCode: code })
@@ -21,8 +23,8 @@ const extOf = (p: string) => p.split('.').pop()!.toLowerCase()
 
 app.get('/', async (_req, reply) => reply.type('text/html; charset=utf-8').send(await readFile(resolve('ui/index.html'), 'utf8')))
 
-app.get('/api/prompt', async (_req, reply) => {
-  const p = resolve('harness/PROMPT_INICIO.md')
+app.get<{ Querystring: { tipo?: string } }>('/api/prompt', async (req, reply) => {
+  const p = resolve(req.query.tipo === 'lote' ? 'harness/PROMPT_LOTE.md' : req.query.tipo === 'orquestador' ? 'harness/PROMPT_ORQUESTADOR.md' : 'harness/PROMPT_INICIO.md')
   return reply.type('text/plain; charset=utf-8').send(existsSync(p) ? await readFile(p, 'utf8') : '')
 })
 
@@ -43,7 +45,8 @@ app.get('/api/estado', async () => {
       const hs = hojas.filter((h) => h.entrega === n)
       const dir = join(D.entregas, safeId(n))
       const ens = await readFile(join(dir, 'ensamblado.json'), 'utf8').then(JSON.parse).catch(() => null)
-      return { nombre: n, conteo: Object.fromEntries(ESTADOS.map((e) => [e, hs.filter((h) => h.estado === e).length])), ensamblado: ens, tieneDocx: existsSync(join(dir, 'documento.docx')) }
+      const estilo = (await leerEstilo(n)).nombre
+      return { nombre: n, estilo, conteo: Object.fromEntries(ESTADOS.map((e) => [e, hs.filter((h) => h.estado === e).length])), ensamblado: ens, tieneDocx: existsSync(join(dir, 'documento.docx')) }
     }),
   )
   return { hojas: hojas.map(slim), entregas, herramientas: await toolsAvailable() }
@@ -59,7 +62,7 @@ app.post('/api/subir', async (req) => {
     }
     const data = await part.toBuffer()
     if (part.file.truncated) {
-      resultados.push({ archivo: part.filename, guardadas: [], avisos: ['Excede 80 MB.'] })
+      resultados.push({ archivo: part.filename, guardadas: [], avisos: ['Excede 600 MB.'] })
       continue
     }
     const r = await ingest(part.filename || 'archivo', data, entrega)
@@ -94,10 +97,12 @@ async function resolveFile(estado: string, id: string, tipo: string): Promise<st
   })
 }
 
-app.get<{ Querystring: { estado: string; id: string; tipo: string; descargar?: string } }>('/api/archivo', async (req, reply) => {
+app.get<{ Querystring: { estado: string; id: string; tipo: string; descargar?: string; mini?: string } }>('/api/archivo', async (req, reply) => {
   const { estado, id, tipo } = req.query
   let p = await resolveFile(estado, id, tipo)
   if (!existsSync(p)) throw bad('No encontrado.', 404)
+  if (req.query.mini && /\.(jpe?g|png|webp)$/i.test(p))
+    return reply.header('Cache-Control', 'private, max-age=300').type('image/jpeg').send(await miniatura(p).catch(() => { throw bad('No se pudo generar la miniatura.', 500) }))
   if (tipo === 'pdf') p = await docxToPdf(p).catch(() => { throw bad('No se pudo generar el PDF (¿LibreOffice instalado?).', 500) })
   const name = `${safeId(id.split('/').pop() ?? id)}.${extOf(p)}`
   if (req.query.descargar) reply.header('Content-Disposition', `attachment; filename="${name}"`)
@@ -116,6 +121,15 @@ app.get<{ Querystring: { nombre: string; tipo: string; descargar?: string } }>('
   return reply.header('Cache-Control', 'no-store').type(MIME[extOf(p)]).send(await readFile(p))
 })
 
+/** Pasa las fotos sueltas (sin entrega) a una entrega con ese nombre. */
+app.post<{ Body: { entrega: string } }>('/api/agrupar', async (req) => {
+  try {
+    return await agruparSueltas(String(req.body?.entrega ?? ''))
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudo agrupar.')
+  }
+})
+
 app.post<{ Body: { entrega: string; ordenOriginal?: boolean } }>('/api/ensamblar', async (req) => {
   if (!req.body?.entrega) throw bad('Falta la entrega.')
   try {
@@ -123,6 +137,76 @@ app.post<{ Body: { entrega: string; ordenOriginal?: boolean } }>('/api/ensamblar
   } catch (e) {
     throw bad(e instanceof Error ? e.message : 'No se pudo ensamblar.')
   }
+})
+
+// ───────── Estilo de la entrega ─────────
+
+app.get('/api/estilos', async () => ({ presets: PRESETS, fuentes: FUENTES, paletas: PALETAS, limites: LIMITES }))
+
+app.get<{ Querystring: { entrega: string } }>('/api/estilo', async (req) => {
+  if (!req.query.entrega) throw bad('Falta la entrega.')
+  return leerEstilo(req.query.entrega)
+})
+
+/** Propone un estilo derivado de la semilla (la misma semilla da el mismo estilo). No guarda nada. */
+app.post<{ Body: { entrega: string; semilla?: string } }>('/api/estilo/variar', async (req) => {
+  if (!req.body?.entrega) throw bad('Falta la entrega.')
+  return variarEstilo(req.body.semilla?.trim() || req.body.entrega)
+})
+
+/** Lee un documento de ejemplo (DOCX o PDF) y propone un estilo a partir de él. No guarda nada. */
+app.post('/api/estilo/extraer', async (req) => {
+  const parte = await req.file({ limits: { fileSize: 40 * 1024 * 1024 } })
+  if (!parte) throw bad('Falta el archivo de ejemplo.')
+  const data = await parte.toBuffer()
+  if (parte.file.truncated) throw bad('El ejemplo pesa más de 40 MB.')
+  try {
+    const r = await extraerFormato(parte.filename || 'ejemplo', data)
+    const base = safeId(parte.filename || 'ejemplo').slice(0, 24)
+    return { ...r, estilo: { ...r.estilo, nombre: `ejemplo ${base}` } }
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudo leer el ejemplo.')
+  }
+})
+
+/** Guarda el estilo y rehace los documentos de la entrega a partir de las transcripciones guardadas. */
+app.put<{ Body: { entrega: string; estilo: unknown } }>('/api/estilo', async (req) => {
+  if (!req.body?.entrega) throw bad('Falta la entrega.')
+  const estilo = await guardarEstilo(req.body.entrega, req.body.estilo)
+  try {
+    return { estilo, ensamblado: await regenerarEntrega(req.body.entrega) }
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudieron regenerar los documentos.', 500)
+  }
+})
+
+// ───────── Editar y aprobar una hoja ya cerrada ─────────
+
+function dirHoja(estado: string, id: string): string {
+  if (estado !== 'procesadas' && estado !== 'revision') throw bad('Solo se editan hojas ya cerradas (procesadas o en revisión).')
+  if (!id || id.includes('/') || id.includes('..')) throw bad('Id no válido.')
+  const dir = join(D[estado], id)
+  if (!existsSync(dir)) throw bad('No encontrada.', 404)
+  return dir
+}
+const entregaDe = async (dir: string) => (await readFile(join(dir, 'meta.json'), 'utf8').then(JSON.parse).catch(() => ({}))).entrega ?? ''
+
+app.put<{ Body: { estado: string; id: string; texto: string } }>('/api/transcripcion', async (req) => {
+  const { estado, id, texto } = req.body ?? ({} as any)
+  const dir = dirHoja(estado, id)
+  try {
+    return await guardarTranscripcion(dir, id, await entregaDe(dir), String(texto ?? ''))
+  } catch (e) {
+    throw bad(e instanceof Error ? e.message : 'No se pudo guardar.')
+  }
+})
+
+app.post<{ Body: { estado: string; id: string } }>('/api/aprobar', async (req) => {
+  const { estado, id } = req.body ?? ({} as any)
+  const dir = dirHoja(estado, id)
+  const informe = await aprobarHoja(dir, id)
+  const entrega = await entregaDe(dir)
+  return { metricas: informe.metricas, ensamblado: entrega ? await regenerarEntrega(entrega) : null }
 })
 
 // Puerto: UI_PORT, o 8080; si está ocupado, el siguiente libre.

@@ -10,6 +10,13 @@ Eres un **transcriptor**: recibes la foto de una hoja de libreta (álgebra linea
 - Si dudas entre dos lecturas, elige la más probable y declara la duda: `<!-- DUDA: celda (2,3) de la segunda matriz, ¿5 o 6? -->`.
 - Texto tachado: no lo transcribas; anótalo `<!-- tachado: ... -->`.
 
+## Lo que no es del alumno, se ignora
+
+- **Los sellos se ignoran por completo.** Un sello del docente o de la escuela ("REVISADO", fechas, nombres, firmas estampadas) no se transcribe, no se menciona en una nota, no genera una `DUDA` y no entra en la medición. Haz como si la hoja no lo tuviera.
+- Si un sello **cae encima de la escritura del alumno**, lee la escritura que se ve debajo. Si no se distingue, pon `[?]` y declara la duda hablando de la **zona ilegible**, sin nombrar el sello.
+- El sistema rechaza el cierre (`validar` / `cerrar`) si una nota tuya o el cuerpo mencionan un sello; reescribe la nota sin esa palabra.
+- Esta regla es solo para sellos. Cualquier otra marca que no sea del alumno (calificaciones, palomitas, correcciones del docente, firmas manuscritas): **no decidas tú**; no las transcribas y avísalo con una `DUDA` para que la persona indique qué hacer.
+
 ## Respeta la organización de cada hoja
 
 Cada actividad tiene su propia forma: puede ser *texto, gráfica, texto, gráfica*, o *texto, texto, texto, gráfica, gráfica*. **Reproduce el orden exacto en que aparecen** el texto, las fórmulas y las gráficas, sin reordenar, resumir ni uniformar. No añadas títulos como "Ejercicio 3" si el alumno no los escribió. Dos actividades distintas no deben parecerse entre sí por culpa de tu formato.
@@ -39,10 +46,31 @@ Mathpix Markdown: texto normal con fórmulas en LaTeX.
   ````
 
   - Elementos: `recta` (`puntos` / `m`+`b` / `a`,`b`,`c` con ax+by=c / `x` / `y`), `segmento`, `vector` (`de` opcional, `a`), `punto` (`en`), `funcion` (`expr` en `x`, `dominio`), `poligono`, `texto`. Etiquetas con `L_1`, `x^2`.
+  - **Figuras en R3** (vectores, planos, cajas en el espacio): usa `"tipo": "r3"` con puntos `[x,y,z]` y `"proyeccion"` elegible: `"isometrica"` (por defecto: ejes a 120°, rejilla de triangulitos como papel isométrico) o `"caballera"` (x en diagonal a 45°, como se dibuja a mano en la libreta). Elige la que se parezca al trazo del alumno. Elementos: `recta` (2 puntos), `segmento`, `vector` (`de` opcional, `a`), `punto` (`en`), `poligono`, `plano` (`a`,`b`,`c`,`d` con ax+by+cz=d; `d` opcional, 0 por defecto), `texto`. Aristas ocultas: `"punteado": true` en recta/segmento/vector. `"cuadricula": true` dibuja la rejilla. Rangos `x`, `y`, `z` opcionales, mismas reglas de `escala`. Ejemplo:
+
+    ````
+    ```grafica
+    {"tipo":"r3","escala":"sin_valores","proyeccion":"isometrica","cuadricula":true,
+     "elementos":[
+       {"t":"vector","a":[3,2,4],"etiqueta":"v"},
+       {"t":"plano","a":1,"b":1,"c":1,"d":6,"etiqueta":"π"},
+       {"t":"segmento","puntos":[[3,2,4],[3,2,0]],"punteado":true}]}
+    ```
+    ````
   - **`escala`** (obligatoria y honesta): `"leida"` si los números de los ejes están escritos en la hoja; `"sin_valores"` si los ejes no traen números (lo más común: **no los inventes**; dibuja la forma y la posición relativa); `"inferida"` solo si deduces la escala a partir de puntos o ecuaciones escritas. Una gráfica `inferida` va a revisión humana.
   - Dibuja **lo que el alumno dibujó**, aunque esté mal (una recta con la pendiente equivocada se dibuja equivocada). Pon `"cuadricula": true` si el papel era cuadriculado. Los rangos `x`, `y` son los que se ven en la hoja; si no puedes saberlos, omítelos.
-  - Si no puedes describir una figura (3D, geometría compleja), escribe un párrafo `[Gráfica: lo visible, sin inventar valores]`: la hoja irá a revisión.
+  - Si no puedes describir una figura (superficies, geometría compleja), escribe un párrafo `[Gráfica: lo visible, sin inventar valores]`: la hoja irá a revisión. Las figuras en R3 de vectores, rectas y planos sí se dibujan con `"tipo": "r3"` (ver arriba).
   - Después de escribir el bloque, `pnpm harness validar` te dice si el JSON es válido.
+## Título de la actividad (lo pone el sistema)
+
+El documento final lleva, por cada actividad, solo el título **"Actividad N"** y debajo la transcripción: sin fechas, sin nombres internos, sin notas. Ese título sale de tu marca `<!-- ejercicio: act-NN/N -->`, así que **la marca es obligatoria en la primera hoja de cada actividad**. El renglón de encabezado que el alumno escribió arriba (fecha y/o "Actividad N") el sistema lo quita solo; **no transcribas** la fecha, el nombre del alumno ni el grupo que aparezcan en el encabezado: no son contenido. Sí transcribe el enunciado que acompañe a la actividad ("Resolver por eliminación gaussiana…"). No inventes títulos ni agregues "Ejercicio 3" si el alumno no lo escribió.
+
+**El número del encabezado puede no coincidir con la base.** Identifica la actividad por su **enunciado** (`pnpm harness actividades <palabra clave>`), no por el número escrito arriba: si no coinciden, manda la marca de la base y deja una `DUDA`.
+
+**Hojas sin encabezado**: una hoja que no dice "Actividad N" casi siempre **continúa** la anterior (las fotos llegan en el orden en que se tomaron). No repitas la marca de ejercicio salvo que empiece otro ejercicio.
+
+**Respuestas recuadradas**: si el alumno encerró un resultado en un recuadro, escríbelo con `\boxed{…}` (sale como recuadro de Word y el validador lo verifica igual).
+
 ## Qué actividad y ejercicio es (orden de la entrega)
 
 Las hojas de un mismo alumno llegan como una **entrega** y pueden venir desordenadas. Para que el sistema las ordene por ejercicio e inciso, marca dónde empieza cada parte:
@@ -51,6 +79,17 @@ Las hojas de un mismo alumno llegan como una **entrega** y pueden venir desorden
 - Para saber cuál es, usa `pnpm harness actividades [texto]`: lista los **enunciados** de la base (sin respuestas) y los comparas con lo que dice la hoja. Solo marca cuando estés **seguro**; si no, no marques y deja una `<!-- DUDA: ... -->`.
 - Lo que va sin marca se considera continuación de lo anterior y se queda con ello. Si una hoja continúa un ejercicio de la hoja previa, no repitas la marca.
 - Si el alumno escribió un número de ejercicio, transcríbelo como texto **además** de marcar.
+
+## Hojas isométricas (figuras en el espacio)
+
+Algunas actividades (vectores en R³, transformaciones 3D) traen una **hoja isométrica**: papel con rejilla de triángulos y tres ejes a 120°, casi siempre varias figuras en la misma hoja ("Ejercicio 1", "Ejercicio 2"…). Son lo más difícil de leer:
+
+- **Una figura = un bloque `grafica`** con `"tipo":"r3"` y `"proyeccion":"isometrica"`, puesto donde corresponde al ejercicio (con su `<!-- ejercicio: act-NN/N -->`). No mezcles varias figuras en un solo bloque.
+- **Guíate por los números escritos junto a las puntas**, p. ej. `(6,7,0)`, `(1,5,2)`: son las coordenadas del vector. Los ejes no traen números, así que la escala es `"inferida"` y la hoja irá a revisión; es lo esperable.
+- Los **paralelepípedos o proyecciones punteadas** que el alumno dibuja para ubicar el punto se describen con `segmento` y `"punteado": true`. Los vectores, con `vector` (`"de"` solo si no parten del origen).
+- Los colores que use el alumno (un vector azul, otro verde) no se reproducen; no los menciones.
+- Si una figura es demasiado confusa, **no la inventes**: escribe `[Gráfica: lo visible]` para esa figura y declara una `DUDA`. Mejor un hueco claro que una figura equivocada.
+- La foto de una hoja isométrica suele ser apaisada y con el papel inclinado; usa la copia mejorada y ten cuidado con los signos de las coordenadas.
 
 ## Fotos de baja calidad
 
@@ -67,7 +106,7 @@ Las hojas de un mismo alumno llegan como una **entrega** y pueden venir desorden
    - Si leíste bien, el error es del alumno: déjalo y cierra con `--revisado`.
 6. Repite 5 hasta que no haya errores.
 7. `pnpm harness cerrar <id>` (opciones: `--revisado`, `--revision`, `--nota "…"`). Si quedan `[?]`, dudas, gráficas de escala inferida o figuras sin dibujar, la hoja va sola a `revision/` para la persona.
-   Si te piden terminar una entrega completa: al cerrar la última hoja, `pnpm harness ensamblar <entrega>` une todo en un documento ordenado.
+   Al cerrar **la última hoja de una entrega**, el sistema la ensambla solo: un único documento con todas las actividades en orden (1, 2, 3…), aunque las hojas hayan llegado desordenadas o vengan de un ZIP. No hace falta que ejecutes `ensamblar` salvo que te lo pidan (p. ej. para rehacerlo).
 8. **Detente y reporta**: id, dónde quedó, cuántas dudas, qué te costó. No tomes otra hoja hasta que la persona lo pida.
 
 ## Límites

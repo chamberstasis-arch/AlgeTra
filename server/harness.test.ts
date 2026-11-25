@@ -72,3 +72,48 @@ describe('ensamblado por ejercicio e inciso', () => {
     expect(s[0].text).not.toMatch(/DUDA/)
   })
 })
+
+describe('sellos', () => {
+  const lint = (src: string) => lintTranscription(parseMarkers(src), null, [])
+  it('una nota que menciona el sello bloquea el cierre', () => {
+    expect(lint('$$x=1$$ <!-- hay un sello rojo de revisión -->').errors.join()).toMatch(/sello/i)
+    expect(lint('$$x=1$$ <!-- DUDA: bajo el sello, ¿1 o 7? -->').errors.join()).toMatch(/sello/i)
+  })
+  it('hablar de la zona ilegible está permitido', () => {
+    expect(lint('$$x=1$$ <!-- DUDA: zona ilegible, ¿1 o 7? -->').errors).toEqual([])
+  })
+  it('parseMarkers expone todas las notas', () => {
+    expect(parseMarkers('a <!-- ejercicio: act-01/1 --> b <!-- nota --> c').comments).toEqual(['ejercicio: act-01/1', 'nota'])
+  })
+})
+
+import { componerCuerpo, quitarEncabezado, tituloActividad } from './harness'
+
+describe('título de actividad y encabezado de la hoja', () => {
+  it('act-24 → "Actividad 24" (sin ceros ni notas)', () => {
+    expect(tituloActividad('act-24')).toBe('Actividad 24')
+    expect(tituloActividad('act-03')).toBe('Actividad 3')
+  })
+  it('quita el renglón de fecha y "Actividad N" del alumno, en cualquier orden', () => {
+    expect(quitarEncabezado('16/10/2026 Actividad 17\n\n<!-- nota -->\n<!-- ejercicio: act-17/1 -->\nSea $u$')).toBe('\n<!-- nota -->\n<!-- ejercicio: act-17/1 -->\nSea $u$')
+    expect(quitarEncabezado('Actividad 24 24/01/2025\nHola')).toBe('Hola')
+    expect(quitarEncabezado('Fecha: 3-4-25\nActividad no. 5\nHola')).toBe('Hola')
+  })
+  it('no toca renglones con más contenido ni encabezados fuera del inicio', () => {
+    expect(quitarEncabezado('Sea $u$\nActividad 24')).toBe('Sea $u$\nActividad 24')
+    expect(quitarEncabezado('Sea $u$\nActividad 24')).toBe('Sea $u$\nActividad 24')
+    expect(quitarEncabezado('1. $v = 3j$')).toBe('1. $v = 3j$')
+  })
+  it('si el encabezado trae el enunciado, quita solo el prefijo y lo conserva', () => {
+    expect(quitarEncabezado('Actividad 6 - Resolver por eliminación gaussiana\n$$A$$')).toBe('Resolver por eliminación gaussiana\n$$A$$')
+    expect(quitarEncabezado('Act 19 Producto escalar en $\\mathbb{R}^2$\nSea $u$')).toBe('Producto escalar en $\\mathbb{R}^2$\nSea $u$')
+  })
+  it('el cuerpo lleva solo "Actividad N" y la transcripción, en orden, sin repetir el título', () => {
+    const hoja = (n: number, act: string, ej: string, texto: string) => splitSegments(`<!-- ejercicio: ${act}/${ej} -->\n${texto}`, n)
+    const segs = [...hoja(1, 'act-10', '1', 'Diez uno'), ...hoja(2, 'act-2', '1', 'Dos uno'), ...hoja(3, 'act-2', '2', 'Dos dos')]
+    expect(componerCuerpo(orderSegments(segs))).toBe('# Actividad 2\n\nDos uno\n\nDos dos\n\n# Actividad 10\n\nDiez uno')
+  })
+  it('lo que no tiene actividad va sin título', () => {
+    expect(componerCuerpo(orderSegments(splitSegments('Texto huérfano', 1)))).toBe('Texto huérfano')
+  })
+})
